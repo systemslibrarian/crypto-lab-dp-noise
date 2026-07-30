@@ -1,0 +1,11 @@
+NEW DEMO BRIEF
+- Repo name:         crypto-lab-dp-noise
+- Short name (H1):   DP Noise
+- Subtitle:          Differential privacy · ε-δ · Laplace mechanism
+- One-liner:         Differential privacy where adding calibrated noise to query results guarantees that no individual's data meaningfully changes the output — the math behind Apple, Google, and US Census privacy.
+- Concept to teach:  DP answers "how much does one person's data affect the output?" with a mathematical bound (ε) — smaller ε means stronger privacy but noisier answers, and the tradeoff between privacy and utility is the entire game.
+- Primitives/spec:   Dwork-McSherry-Nissim-Smith 2006 (DP definition), Laplace mechanism, Gaussian mechanism, composition theorems
+- Accent (--accent): #ec4899
+- Favicon emoji:     🎲
+- In scope:          Interactive ε slider: query a toy database ("average salary"), drag ε from 0.01 to 10 and watch the noise distribution widen/narrow around the true answer; Laplace mechanism visualization (PDF overlay on the true value); composition: run multiple queries and watch the privacy budget deplete; the "one person in or out" definition with a toggle (add/remove one record, observe bounded output change); real-world deployments panel: Apple (emoji usage), Google (RAPPOR), US Census (2020 redistricting); comparison to k-anonymity and why DP is stronger; natural arc with silent-tally — MPC protects the inputs, DP protects the output
+- Non-goals:         No local vs global DP deep dive (mention only); no Rényi DP or zero-concentrated DP; no federated learning integration; acknowledge this is adjacent to crypto, not a cryptographic primitive itself — its home is §23 because obliviousness is the shared concept
