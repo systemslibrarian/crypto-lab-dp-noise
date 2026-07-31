@@ -40,6 +40,56 @@ async function scan(page: Page, label: string, include?: string): Promise<void> 
   ).toEqual([]);
 }
 
+/**
+ * The guided route removes the expert panels, so almost every drive below would
+ * be clicking a hidden element. Switch once, up front; the guided state is
+ * scanned before this runs and the navigator is scanned again at the end.
+ */
+async function switchToExplore(page: Page): Promise<void> {
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  await expect(page.locator('#guess')).toBeVisible();
+}
+
+/** The bounded-sensitivity exercise: every bound, and all three decisions. */
+async function driveBounds(page: Page): Promise<void> {
+  for (const hi of ['100000', '150000', '500000', '250000']) {
+    await page.selectOption('#bound-hi', hi);
+    await expect(page.locator('#bound-out .stat').first()).toBeVisible();
+  }
+  await page.click('#bound-clip');
+  await expect(page.locator('#bound-decision-out .verdict')).toContainText('biased by a known amount');
+  await page.click('#bound-reject');
+  await expect(page.locator('#bound-decision-out .verdict')).toContainText('different question');
+  // The refusal is the one that has to be scanned in both themes: it is the
+  // only place on the page where a chosen option is answered with "no".
+  await page.click('#bound-expand');
+  await expect(page.locator('#bound-decision-out .verdict')).toContainText('not a private calibration');
+}
+
+/**
+ * The exit challenge. A wrong answer first, so the "revisit this" verdict and
+ * its pointer link get scanned, then the correct answer to every question.
+ * The correct option sits at a different index in each — deliberately, so a
+ * reader cannot pattern-match position — hence the varied indices here.
+ */
+async function driveExit(page: Page): Promise<void> {
+  await page.click('#x-sensitivity-0');
+  await expect(page.locator('#exit-result .verdict')).toContainText('to revisit');
+  await page.click('#x-sensitivity-1');
+  await page.click('#x-composition-0');
+  await page.click('#x-anonymisation-2');
+  await page.click('#x-delta-1');
+  await expect(page.locator('#exit-result .verdict')).toContainText('All four transferred');
+}
+
+/** Classroom mode on, then off — both labels get scanned. */
+async function driveTeaching(page: Page): Promise<void> {
+  await page.check('#seed-toggle');
+  await expect(page.locator('#teaching-mode .note')).toContainText('Reproducible classroom run');
+  await page.uncheck('#seed-toggle');
+  await expect(page.locator('#teaching-mode .note')).toContainText('Live cryptographic randomness');
+}
+
 /** All four prediction checks, left answered so later scans see a verdict. */
 async function drivePredictions(page: Page): Promise<void> {
   await page.click('#pr-epsilon-0');
@@ -138,6 +188,12 @@ async function driveBudget(page: Page): Promise<void> {
 
 async function driveAll(page: Page): Promise<void> {
   await freeze(page);
+  // The guided route as a first-time reader meets it: navigator, objectives,
+  // classroom switch, and the expert panels genuinely absent.
+  await scan(page, 'the guided route, nothing established yet');
+  await driveTeaching(page);
+  await scan(page, 'classroom mode toggled on and off', '#intro');
+  await switchToExplore(page);
   await drivePredictions(page);
   await scan(page, 'prediction checks answered', '#intro');
   await driveLeak(page);
@@ -152,9 +208,16 @@ async function driveAll(page: Page): Promise<void> {
   await scan(page, 'sampled histograms and the guessing game', '#guess');
   await driveDial(page);
   await scan(page, 'the privacy/utility dial', '#dial');
+  await driveBounds(page);
+  await scan(page, 'the bounded-sensitivity exercise, all three decisions', '#bounds');
   await driveBudget(page);
   await scan(page, 'the budget ledger and the averaging attack', '#budget');
   await scan(page, 'the deployments panel', '#wild');
+  await driveExit(page);
+  await scan(page, 'the exit challenge, answered', '#exit');
+  // The navigator with all four ideas established, which is a different render
+  // from the one scanned at the top of this sweep.
+  await scan(page, 'the core path, complete', '#path');
   // One whole-page pass with every exhibit in its final state.
   await scan(page, 'the finished page, end to end');
 }

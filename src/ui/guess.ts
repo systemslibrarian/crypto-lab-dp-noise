@@ -18,13 +18,16 @@ import { countHighEarners, EMPLOYEES, TARGET_ID, without } from '../dp/database'
 import { discreteLaplacePmf } from '../dp/discrete';
 import { optimalGuessRate, type CurveSpec } from '../dp/guarantee';
 import { release, type MechanismSpec } from '../dp/mechanism';
-import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER, epsLabel } from '../dp/params';
+import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER } from '../dp/params';
 import { toNumber } from '../dp/rational';
-import { cryptoRng, uniformBelow } from '../dp/rng';
-import { chart, legend, type Series } from './chart';
-import { byId, chunked, clear, el, num, pct, stat, statRow, verdict } from './dom';
+import { uniformBelow } from '../dp/rng';
+import { chart, chartData, legend, type Series } from './chart';
+import { byId, chunked, clear, el, layered, num, pct, stat, statRow, verdict } from './dom';
+import { quote } from './ledger';
+import { bindEpsSlider } from './link';
+import { randomnessNote, sharedRng } from './random';
 
-const rng = cryptoRng();
+const rng = sharedRng();
 const SAMPLES = 2_000;
 
 const WITH_ALICE = countHighEarners.run(EMPLOYEES);
@@ -73,8 +76,9 @@ export function initGuess(): void {
     renderGame(state, epsNow());
   };
 
-  slider.addEventListener('input', () => {
-    byId('guess-eps-value').textContent = epsLabel(Number(slider.value));
+  // Changing ε changes what "the best possible score" means, so a tally
+  // accumulated at the old ε would be a comparison against the wrong ceiling.
+  bindEpsSlider(slider, 'guess-eps-value', () => {
     renderTheory(epsNow());
     resetGame();
   });
@@ -110,7 +114,6 @@ export function initGuess(): void {
     });
   }
 
-  byId('guess-eps-value').textContent = epsLabel(Number(slider.value));
   renderTheory(epsNow());
   resetGame();
   renderSampleIdle();
@@ -218,6 +221,39 @@ function renderSamples(
       { label: 'exact probability, with Alice', style: 'a', kind: 'steps' },
       { label: 'exact probability, without Alice', style: 'b', kind: 'steps' },
     ]),
+    chartData({
+      caption: `Sampled share of ${num(drawn)} draws from each world against the exact probability, per outcome.`,
+      headers: [
+        'Released answer',
+        'Sampled, with Alice',
+        'Exact, with Alice',
+        'Sampled, without',
+        'Exact, without',
+      ],
+      rows: ta
+        .map(([x, p], i) => [x, a[i][1], p, b[i][1], tb[i][1]] as const)
+        .filter(([, sa, pa, sb, pb]) => sa > 0 || sb > 0 || pa > 1e-4 || pb > 1e-4)
+        .slice(0, 60)
+        .map(([x, sa, pa, sb, pb]) => [
+          String(x),
+          sa.toFixed(4),
+          pa.toFixed(4),
+          sb.toFixed(4),
+          pb.toFixed(4),
+        ]),
+      trend:
+        `Both sampled columns track their exact counterparts to within sampling error, and the two worlds' columns ` +
+        `differ from each other by roughly one outcome's worth of shift.`,
+      notice:
+        `Compare a sampled column against its exact column first — that is the check that the sampler is the ` +
+        `mechanism it claims to be. Then compare the two worlds against each other: at small ε you will not find a ` +
+        `row where one world is clearly the source, which is the guarantee, felt rather than quoted.`,
+      sampled:
+        `The two "sampled" columns are ${num(drawn)} real draws each from the exact discrete-Laplace sampler, so they ` +
+        `carry sampling error and will differ on every run. The two "exact" columns are the closed-form PMF and do ` +
+        `not vary. Agreement between them is evidence the implementation is right; it is not a proof of the ` +
+        `definition, which is a statement about every possible output rather than the ones drawn here.`,
+    }),
   );
 }
 
@@ -248,11 +284,30 @@ function renderSampleSummary(
       ],
       'Sampled versus predicted distinguishability',
     ),
-    verdict(
+    layered(
       Math.abs(measured - theory) < 0.03 ? 'ok' : 'warn',
       `Sampled and predicted agree to ${pct(Math.abs(measured - theory), 2)}`,
-      'The histograms were built by the same exact sampler the rest of the page uses; the prediction came from the ' +
-        'closed-form PMF. They are two independent routes to the same number, which is the check worth making.',
+      {
+        observation:
+          `Measuring the best possible guess rate off the two histograms gives ${pct(measured)}; the closed form ` +
+          `predicts ${pct(theory)}.`,
+        meaning:
+          'Two independent routes to the same number: the histograms came from the exact sampler the rest of the ' +
+          'page uses, the prediction from the mechanism’s own PMF. Agreement is the check worth making, because a ' +
+          'sampler that quietly disagreed with its own distribution would break the privacy claim without breaking ' +
+          'anything visible.',
+        details: [
+          'The measured figure is (1 + TV)/2 where TV is the total variation distance read off the two histograms, ' +
+            'and the predicted one is the same quantity computed from the closed-form PMF. For the discrete Laplace ' +
+            'the exact value is (1 + tanh(ε/2))/2, which is also exactly e^ε/(1 + e^ε) — the belief bound. The suite ' +
+            'asserts that equality at every stop on the ε ladder.',
+          'A finite sample can only ever be evidence. Two thousand draws per world pins the measured rate to roughly ' +
+            'a percentage point, so a disagreement smaller than that says nothing either way, and this panel is not ' +
+            'a test of whether the mechanism is differentially private — it is a test of whether this implementation ' +
+            'samples the distribution it says it does.',
+          randomnessNote(),
+        ],
+      },
     ),
   );
 }
@@ -295,10 +350,33 @@ function renderGame(
         stat('Your score', `${state.right} / ${state.played}`, state.played ? pct(rate) : 'no rounds yet'),
         stat('Best possible', pct(theory), `at ε = ${eps}`),
         stat('Pure guessing', '50.0%', 'the floor'),
+        // Every deal is a genuine release of the counting query, and a panel
+        // that dealt hundreds of them without ever naming a price would be
+        // teaching the exact habit Exhibit 5 exists to break.
+        stat('Released so far', String(state.dealt !== null ? state.played + 1 : state.played), 'each deal is a real release'),
       ],
       'Your accuracy against the theoretical ceiling',
     ),
   );
+
+  const dealtCount = state.dealt !== null ? state.played + 1 : state.played;
+  if (dealtCount > 0) {
+    const spent = dealtCount * eps;
+    const cost = quote(eps, 'Guessing game deal');
+    out.append(
+      el('p', { class: 'note' }, [
+        el('strong', { text: 'What this game has cost. ' }),
+        document.createTextNode(
+          `${dealtCount} ${dealtCount === 1 ? 'deal' : 'deals'} at ε = ${eps} is ε = ${num(spent, 2)} by basic ` +
+            `composition — every one was a real release of the counting query, drawn by the real mechanism. Against ` +
+            `the session ledger in Exhibit 5, one more would take the total to ${num(cost.total, 3)} of ` +
+            `${num(cost.budget, 2)}${cost.wouldRefuse ? ', which is over budget and would be refused' : ''}. The game ` +
+            `quotes rather than charges, because being locked out of a teaching panel would teach nothing; a real ` +
+            `system does not have that luxury.`,
+        ),
+      ]),
+    );
+  }
 
   if (state.played >= 10) {
     const overshoot = rate - theory;

@@ -65,6 +65,50 @@ export function verdict(kind: VerdictKind, headline: string, detail?: string | N
 }
 
 /**
+ * The three-layer readout this page uses after an interaction.
+ *
+ * The rigor was never the problem; the *simultaneity* was. A verdict that opens
+ * with continuous-versus-discrete calibration, the lattice shift and a paper
+ * citation is correct and unreadable to the person the sentence is for. So each
+ * one is staged:
+ *
+ * - **Observation** — one sentence naming what just changed on screen.
+ * - **Meaning** — one or two sentences tying it to the thing being taught.
+ * - **Why the details matter** — a disclosure holding the exact formulas, the
+ *   calibration caveats and the citations.
+ *
+ * The disclosure's label always says a caveat is *there*, never that there
+ * isn't one. Staging rigor behind a click is a teaching decision; hiding it
+ * would be a dishonest one, and this page's whole claim is that it does not do
+ * that.
+ */
+export interface Layers {
+  readonly observation: string;
+  readonly meaning: string;
+  readonly details?: readonly (string | Node)[];
+  /** Overrides the disclosure label when the caveat has a specific name. */
+  readonly detailsLabel?: string;
+}
+
+export function layered(kind: VerdictKind, headline: string, layers: Layers): HTMLElement {
+  const body = el('div', { class: 'layered' }, [
+    el('p', { class: 'layered__observation', text: layers.observation }),
+    el('p', { class: 'layered__meaning', text: layers.meaning }),
+  ]);
+  if (layers.details?.length) {
+    body.append(
+      el('details', { class: 'layered__more' }, [
+        el('summary', {
+          text: layers.detailsLabel ?? 'Why the details matter — the exact accounting, and the caveats it carries',
+        }),
+        ...layers.details.map((d) => (typeof d === 'string' ? el('p', { text: d }) : d)),
+      ]),
+    );
+  }
+  return verdict(kind, headline, body);
+}
+
+/**
  * One labelled number, as a dt/dd pair inside the single `div` a `<dl>` is
  * allowed to wrap a group in. The note goes *inside* the `dd` — a sibling
  * paragraph would be a third element in that group, which is invalid list
@@ -78,6 +122,30 @@ export function stat(label: string, value: string, note?: string): HTMLElement {
 
 export function statRow(stats: HTMLElement[], label?: string): HTMLElement {
   return el('dl', { class: 'stat-row', ...(label ? { 'aria-label': label } : {}) }, stats);
+}
+
+/**
+ * An in-page link that can also widen the route it is pointing into.
+ *
+ * Some of the page is set aside on the guided route, and some pointers — a
+ * "revisit this" after a wrong challenge answer, most of all — target exactly
+ * that material. A link to a section the reader's route has removed is the worst
+ * kind of broken pointer: it scrolls somewhere plausible and the thing is not
+ * there. `onFollow` runs before the jump so the link can switch the route first.
+ *
+ * The label says so too. Silently changing what is on someone's page is not
+ * better than a dead link, merely quieter.
+ */
+export function jumpLink(
+  href: string,
+  text: string,
+  opts: { onFollow?: () => void; note?: string } = {},
+): HTMLElement {
+  const link = el('a', { href, text });
+  if (opts.onFollow) link.addEventListener('click', opts.onFollow);
+  if (!opts.note) return link;
+  const wrap = el('span', {}, [link, el('span', { class: 'jump__note', text: ` ${opts.note}` })]);
+  return wrap;
 }
 
 /** Wraps wide content so it scrolls on its own and stays keyboard reachable. */

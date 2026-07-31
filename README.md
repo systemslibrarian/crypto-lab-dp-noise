@@ -3,6 +3,7 @@
 **Differential privacy · ε-δ · Laplace mechanism** — runs the real Laplace and Gaussian mechanisms over a twelve-person payroll so you can watch two databases that differ by one person become impossible to tell apart, and watch the guarantee evaporate when the budget is spent.
 
 **Live demo:** https://systemslibrarian.github.io/crypto-lab-dp-noise/
+**Teaching with it:** [TEACHING.md](TEACHING.md) — prerequisites, 15/30/60-minute routes, discussion prompts, expected misconceptions, and which interactions are stochastic.
 
 ---
 
@@ -29,12 +30,29 @@ All randomness comes from `crypto.getRandomValues`. ε is an exact rational thro
 
 **Security model:** a *statistical* guarantee against an adversary with unlimited computing power and unlimited side knowledge, bounding what can be concluded about **any one individual**. It is not a cryptographic primitive; nothing here is encrypted. **This is not production code** — it is a teaching demo.
 
+## How the Page Is Structured
+
+The page is a lesson with a reference inside it, and it opens as the lesson.
+
+- **One curriculum table** (`src/ui/curriculum.ts`) drives three things that used to be three parallel lists able to drift apart: the objectives stated up front, the core path's four steps, and the exit challenge's four questions. An objective with no interaction behind it, or an interaction nothing tests, is now not expressible.
+- **Learning objectives** are stated up front, before any exhibit.
+- **A core path** of four ideas sits immediately after the intro: why aggregates fail, what ε promises, why sensitivity matters, why privacy is a budget. Each names the one interaction that establishes it, the exit question that tests it, and is marked *Established* only once that interaction has actually run — not by scrolling past it, and **not by a linked ε arriving from another exhibit**. Exactly one step carries a *Start here* tag: the first not yet established.
+- **Two routes.** The **guided route** is the default and removes the expert panels (k-anonymity, the guessing experiment, the composition-rule chart, post-processing, the deployments panel), naming in plain text what it has set aside. **Explore everything** restores them. The honest-scoping section is never hidden on either route.
+- **Linked ε.** On the guided route one ε drives Exhibits 2, 3 and 4 together, with a readout beside every control showing `b = Δ/ε` at the current values, what an attacker's belief could reach, and what one release would cost the session ledger. Unlink it to park two exhibits at different ε.
+- **Attack before defence.** On the guided route Exhibit 5 reorders so the averaging attack runs before the ledger appears — the budget arrives as the answer to a problem you have already watched happen. The swap moves DOM nodes rather than setting CSS `order`, so reading and focus order stay in step with the visual order.
+- **An exit challenge** of four scenarios that appear nowhere else on the page, reported as concepts to revisit rather than as a score. Each wrong answer links to the exact interaction that re-establishes the idea — and where that interaction is one the guided route sets aside, the link widens the route on the way and says so.
+- **Every release quotes its price.** The dial, the guessing game and the DP-mode differencing attack all name what they would cost the same session ledger. They quote rather than charge, because being locked out of a teaching panel teaches nothing — but no release on the page is allowed to look free.
+- **Classroom mode** swaps the samplers onto a fixed seed so a lesson can be rehearsed and repeated. It is never the default, it selects and retries nothing, and every seeded panel says so on screen.
+
+See [TEACHING.md](TEACHING.md) for lesson routes and debrief answers.
+
 ## Exhibits
 
 1. **Two harmless totals, one person's salary** — the whole twelve-record database, printed, and then the **differencing attack** run against it: "total payroll" minus "total payroll excluding Alice" is Alice's exact salary, to the dollar, from two queries that never name a person. Switch the same two queries to ε = 1 and the attack still runs and stops meaning anything. Beside it, the obvious alternative: generalise the quasi-identifiers until the table is k-anonymous. The page **measures** k at each generalisation (1 → 1 → 3 → 6) and then runs the **homogeneity attack** — at k = 3 and again at k = 6, every equivalence class is unanimous about the sensitive attribute, so the k guarantee holds fully intact and the salary band falls out anyway.
 2. **The definition, drawn** — the headline mechanism. Two worlds, one with Alice and one without, both asked "how many people earn more than $100,000?" (true answers 6 and 5). The first chart is the two output distributions; the second is the **log of their pointwise likelihood ratio, between rails at ±ε**. Drag ε from 0.01 to 10 and watch that line step from one rail straight to the other and sit there — the bound is *attained at every output*, not merely respected, which is what a tight ε looks like. Switch to the Gaussian and the same line becomes a straight diagonal through both rails: a Gaussian tail is too light for any pure ε, and the page computes the **exact δ** — `Σₓ (Pr[M(D)=x] − e^ε·Pr[M(D′)=x])₊` — that the failure costs. The panel also prints two numbers that turn out to be identical, and explains why: the total variation distance between two discrete Laplace distributions one step apart is exactly `tanh(ε/2)`, so the optimal attacker's success rate `(1 + tanh(ε/2))/2` is exactly the belief bound `e^ε/(1 + e^ε)`. The mechanism is tight in both senses at once, and the suite asserts the equality at every stop on the ladder.
 3. **Can you tell which world you are in?** — the break-it-yourself panel. Draw 2,000 real releases from each world and watch the histograms build across animation frames, overlaid on the exact PMF; the panel then measures the total variation distance off the histograms and compares it with the closed-form prediction. Then the game: a cryptographic coin picks a world, the real mechanism releases one answer, and you guess. Your running score sits next to the best score *any* attacker could achieve at that ε — a theorem, not a comment on your attention span.
 4. **The dial: what ε costs in usefulness** — pick a query, an ε and a mechanism, and read both sides at once: how far an attacker's belief can move, and how wrong the answer is. The typical error and the 95% interval are summed off the mechanism's own PMF. Switching from the headcount to the total payroll changes the noise by five orders of magnitude at the same ε, because **sensitivity**, not ε alone, sets the scale — and the panel shows where Δ came from (a declared clamp, never the observed data). A second panel releases the payroll and the headcount and divides them, because **post-processing is free**.
+4b. **Where does Δ come from? You have to answer** — the deployment skill the rest of the page only describes. Declare a bound on one person's salary *before* looking at the data, and read what it costs on both sides: raise it and the noise rises in proportion, lower it and every record above it is clipped, so the answer is biased by an amount no averaging will remove. Then a thirteenth person is hired at $480,000, above the bound that was already published, and you choose: clip her, drop her record, or quietly raise the bound to fit. The third is offered because it is the one a well-meaning engineer picks, and it is then **refused** — Δ read off the observed maximum makes the *noise scale* a function of the data, so two neighbouring databases produce releases with different scale parameters and an attacker reads the top salary off the noise itself.
 5. **Composition: ε is a budget, not a setting** — a working, fail-closed ledger. Ask questions, watch the budget deplete, and watch a query that would overdraw get **refused** rather than answered. Both composition rules are plotted as functions of k with the crossover computed. Then the attack the ledger exists to prevent: ask the same ε = 0.5 question a few hundred times and average, and the running error falls as 1/√n straight onto the predicted `b√2/√n` curve until the true payroll is recovered — from answers that were each, individually, differentially private.
 6. **ε in the wild** — Apple, Google's RAPPOR, and the 2020 US Census, each ε put through the same belief calculation the rest of the page uses so the numbers can be compared rather than admired. The column that matters is **provenance**: published by the operator, measured by outside researchers from a shipping binary, or derived here from some other published parameter. The Census entry re-derives its own ε from ρ = 2.63, landing on 18.19 by the standard conversion and 17.43 by the Rényi-optimised one against the Bureau's published 17.14 — one mechanism, three defensible labels.
 
@@ -61,7 +79,9 @@ All randomness comes from `crypto.getRandomValues`. ε is an exact rational thro
 
 https://systemslibrarian.github.io/crypto-lab-dp-noise/
 
-Run the differencing attack and recover a salary. Drag ε and watch two distributions merge. Play twelve rounds of the guessing game and land on the theoretical ceiling. Spend a budget until the mechanism refuses to answer. Then run the averaging attack and take the true payroll back.
+Run the differencing attack and recover a salary. Drag ε and watch two distributions merge. Declare a salary bound, then meet the person who does not fit it. Run the averaging attack and take the true payroll back, then spend a budget until the mechanism refuses to answer. Four ideas, about fifteen minutes, and a navigator that tells you which one you are on.
+
+Then switch to **Explore everything** for the rest: play twelve rounds of the guessing game and land on the theoretical ceiling, watch the Gaussian sail through the ±ε rails, and compare Apple's, RAPPOR's and the Census's ε on one axis.
 
 ## Real-World Usage
 
@@ -78,10 +98,12 @@ The 2020 Census is the largest deployment of differential privacy ever attempted
 ```bash
 npm install
 npm run dev        # http://localhost:5173/crypto-lab-dp-noise/
-npm test           # 180 unit tests
+npm test           # 223 unit tests
 npm run build      # typecheck + production build
-npm run test:a11y  # WCAG 2.1 AA gate, both themes (needs a build first)
+npm run test:a11y  # accessibility gates, both themes (needs a build first)
 ```
+
+`npm run test:a11y` runs two suites. `e2e/a11y.spec.ts` is the axe conformance sweep — every exhibit driven through its states, in both themes, on both routes. `e2e/task.spec.ts` is the one that asks whether the lesson can actually be *completed*: the whole core path with a keyboard alone, the same path at 375 × 667 asserting no horizontal overflow with every disclosure open, and every core conclusion read out of the data tables with the SVGs removed from the document. Automated WCAG checks are necessary and they do not establish that a dense mathematical interaction is operable.
 
 ## Related Demos
 
@@ -91,18 +113,25 @@ npm run test:a11y  # WCAG 2.1 AA gate, both themes (needs a build first)
 
 ## Build & Verify
 
-**180 unit tests** (Vitest), all executed in CI before deploy. What they actually pin down:
+**223 unit tests** (Vitest), all executed in CI before deploy. What they actually pin down:
 
 - **Sampler correctness.** `bernoulliExpNeg` is checked against `e^−γ` at five values of γ — the CKS20 parity is easy to transcribe inverted, which silently yields `Bernoulli(1 − e^−γ)`, a sampler that looks right and is exactly wrong. `uniformBelow` is χ²-tested for modulo bias. The discrete Laplace's sampled PMF, mean and variance are checked against the closed form; the discrete Gaussian's mean and variance against σ.
 - **The ε bound itself**, asserted at **every stop on the ε ladder** and end-to-end on the real database: the largest likelihood ratio between the two neighbouring payrolls equals `e^ε` to six digits — attained, not merely respected — and needs a δ below 1e-12.
 - **Reference values.** Φ to twelve digits at nine points plus a relative-error check at Φ(−8) ≈ 6.22e-16, where an absolute-error test would pass for an implementation that returned zero. Laplace closed forms (95% interval = 2.9957·b, 75th percentile = b·ln2). The 2020 Census zCDP conversions.
 - **Cross-checks between independent routes.** The δ summed pointwise off the *discrete* Gaussian's PMF agrees within 10% with Balle & Wang's closed form for the *continuous* Gaussian at the same σ. The analytic calibration is verified to beat the textbook one everywhere the textbook one is claimed to hold, and the textbook σ is verified to actually satisfy its target δ.
 - **The attacks.** The differencing attack recovers the target's salary to the dollar under exact answers and fails under DP; the averaging attack converges within 4 standard deviations of the predicted `b√2/√n`. k is measured at every generalisation level, and the homogeneity leak is asserted at k = 3 and k = 6.
-- **The fail-closed ledger.** An over-budget request returns null *and leaves the ledger unchanged* — the second half is the part worth testing.
+- **The fail-closed ledger.** An over-budget request returns null *and leaves the ledger unchanged* — the second half is the part worth testing. The session ledger the exhibits share is tested separately: a quote must predict a refusal without spending anything, and one panel's spending has to be visible to another's quote.
+- **Contribution bounding.** Δ comes from the declared bound and not from the database: the same bound over two databases with different maxima must give the same Δ and the same noise scale, while `expand` — the option the page refuses — is asserted to give *different* sensitivities for neighbouring databases, which is the leak stated as a test. The bias/noise trade is asserted to run in opposite directions across the offered bounds, and the best bound is asserted to depend on ε rather than on the data alone, because an exercise whose answer never changes is not a decision.
+- **The instructional state.** Completion is idempotent and never notifies twice for the same step, `update` never touches the completion set, and the store opens on the guided route with cryptographic randomness — a default that silently flipped to seeded would make every "this is the real mechanism" claim on the page false.
+- **The curriculum's own integrity.** Every core step has exactly one challenge question and no question is shared; every link is a real in-page anchor; the mid-sentence concept form keeps its proper nouns, so nothing can regenerate it by lowercasing and print "the gaussian"; and the set of revisit targets flagged as expert-gated is asserted exactly, because a flag that drifts sends a guided reader to a section that is not on their page.
 
 Statistical assertions run on a seeded generator, so a failure means the sampler is wrong rather than that a coin landed badly. The page itself uses `crypto.getRandomValues` and never `Math.random()`.
 
-**Accessibility gate:** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes, across ten interaction states per theme — every exhibit driven, every disclosure opened, every verdict rendered. The Pages deploy is blocked if it fails.
+**Accessibility gates**, both blocking the Pages deploy:
+
+- **Conformance.** `@axe-core/playwright` scans the production build for zero WCAG 2.1 A/AA violations in **both** themes, across fourteen interaction states per theme — every exhibit driven, every disclosure opened, every verdict rendered, both routes, and the sensitivity exercise's refusal.
+- **Task completion.** A separate suite asks the question axe cannot: the four core ideas established with **keyboard input only** (Tab, Enter, arrow keys — no synthetic clicks); the same path at **375 × 667** with an assertion of no horizontal overflow, including with every disclosure open; and every core conclusion read **with the chart SVGs removed from the document**, which asserts the findings exist as numbers rather than that the pictures were described.
+- **The lesson's own claims.** Three tests hold the instructional spine to what it says: a linked ε sync must *not* establish another exhibit's step (this one was written against a real bug — moving the dial used to tick off the definition); exactly one step carries the next-action tag, and it advances; and a revisit pointer into expert-gated material actually reveals it.
 
 ## Performance
 

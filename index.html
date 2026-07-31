@@ -177,6 +177,11 @@
           There is no setting that avoids the trade; there is only writing the number down and defending it.
         </p>
 
+        <!-- Rendered from src/ui/curriculum.ts, the single table that also
+             drives the core path and the exit challenge, so the page's
+             promises cannot drift from what establishes or tests them. -->
+        <div id="objectives" class="card card--objectives"></div>
+
         <div id="pr-epsilon" class="predict"></div>
 
         <details>
@@ -239,7 +244,14 @@
           inputs with secure multi-party computation and says nothing about what the result reveals. The two are
           complementary halves of the same problem, and each is useless in the other's place.
         </p>
+
+        <div id="teaching-mode" class="teaching"></div>
       </section>
+
+      <!-- The instructional spine: four ideas, the interaction that establishes
+           each, and the route toggle that decides how much of the page is on
+           screen. Rendered by src/ui/path.ts. -->
+      <div id="path"></div>
 
       <section class="section" id="leak" aria-labelledby="leak-h">
         <p class="kicker">Exhibit 1</p>
@@ -276,7 +288,7 @@
           <div id="leak-out" role="status" aria-live="polite"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-depth="expert">
           <h3>What about anonymising the table instead?</h3>
           <p>
             The obvious alternative is to publish the table with the identifying columns blurred until every record
@@ -330,6 +342,8 @@
           </div>
         </div>
 
+        <div data-readout="definition"></div>
+
         <div id="def-out" role="status" aria-live="polite"></div>
 
         <div class="card card--viz">
@@ -353,7 +367,7 @@
         </div>
       </section>
 
-      <section class="section" id="guess" aria-labelledby="guess-h">
+      <section class="section" id="guess" aria-labelledby="guess-h" data-depth="expert">
         <p class="kicker">Exhibit 3 · break it yourself</p>
         <h2 id="guess-h">Can you tell which world you are in?</h2>
         <p class="lede">
@@ -419,6 +433,8 @@
           </div>
         </div>
 
+        <div data-readout="dial"></div>
+
         <div id="dial-out" role="status" aria-live="polite"></div>
 
         <div class="card">
@@ -430,7 +446,7 @@
           <div id="dial-release-out" role="status" aria-live="polite"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-depth="expert">
           <h3>Post-processing is free</h3>
           <p>
             Release the payroll total and the headcount, then divide them for an average salary. The division costs no
@@ -448,18 +464,66 @@
         </div>
       </section>
 
-      <section class="section" id="budget" aria-labelledby="budget-h">
+      <section class="section" id="bounds" aria-labelledby="bounds-h">
+        <p class="kicker">Exhibit 4b · you decide</p>
+        <h2 id="bounds-h">Where does Δ come from? You have to answer</h2>
+        <p class="lede">
+          Everything above took the payroll query's sensitivity as given. It is not given. A sum has no sensitivity at
+          all until somebody declares how much one person is allowed to contribute, and that declaration is the single
+          most consequential decision in a differentially private release — far more so than which noise distribution
+          gets used. Real deployments fail here, in the query definition, not in the sampler.
+        </p>
+        <p class="lede">
+          So make the declaration yourself. Pick the bound, watch what it does to the noise and to the bias, and then
+          meet the record that does not fit.
+        </p>
+
+        <div class="card">
+          <h3>Declare the range, before you look at the data</h3>
+          <p>
+            Every salary is clamped into this range before the total is taken, which is what gives the query a finite
+            Δ at all. Raise the bound and the noise rises with it; lower it and the answer is systematically too small.
+          </p>
+          <div class="controls">
+            <div class="field field--grow">
+              <label for="bound-hi">Declared upper bound on one person's salary</label>
+              <select id="bound-hi"></select>
+            </div>
+          </div>
+          <div id="bound-out" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="card">
+          <h3>A thirteenth person joins, and she does not fit</h3>
+          <p>
+            The bound was published. Then Mara Kowalski was hired at $480,000. The mechanism has to do something with
+            her record, and all three of these are things real systems do. Two of them are defensible. One is not, and
+            it is the one that looks most reasonable.
+          </p>
+          <div id="bound-choices"></div>
+          <div id="bound-decision-out" role="status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- On the guided route the two panels swap: the averaging attack runs
+           first, and the ledger arrives as the answer to a problem the reader
+           has already watched happen. The swap moves the actual DOM nodes
+           rather than setting CSS `order`, because `order` changes only the
+           visual sequence and leaves reading and focus order behind it — which
+           is a WCAG 1.3.2 failure dressed up as a layout trick. See
+           `applyGuidedOrder` in src/ui/path.ts. -->
+      <section class="section" id="budget" aria-labelledby="budget-h" data-reorder>
         <p class="kicker">Exhibit 5</p>
         <h2 id="budget-h">Composition: ε is a budget, not a setting</h2>
         <p class="lede">
           Every answer released from the same data spends privacy. Ask enough questions and you have spent it all —
-          and the only fail-closed response left is to stop answering. This exhibit is a working ledger, and then the
-          attack the ledger exists to prevent.
+          and the only fail-closed response left is to stop answering. This exhibit is a working ledger, and the attack
+          the ledger exists to prevent.
         </p>
 
         <div id="pr-repeat" class="predict"></div>
 
-        <div class="card">
+        <div class="card" data-order-guided="6">
           <h3>The ledger</h3>
           <p>
             Ask questions and watch the budget deplete. Both composition rules are computed on every request and the
@@ -485,7 +549,7 @@
           <div id="bud-ledger"></div>
         </div>
 
-        <div class="card card--viz">
+        <div class="card card--viz" data-depth="expert" data-order-guided="7">
           <h3>Two ways to add up privacy loss</h3>
           <p>
             Basic composition adds ε. Advanced composition grows as √k instead, in exchange for a small extra failure
@@ -494,7 +558,7 @@
           <div id="bud-composition"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-order-guided="5">
           <h3>The averaging attack — what happens with no budget at all</h3>
           <p>
             Ask the same question over and over and average the answers. Every individual answer is differentially
@@ -512,7 +576,7 @@
         </div>
       </section>
 
-      <section class="section" id="wild" aria-labelledby="wild-h">
+      <section class="section" id="wild" aria-labelledby="wild-h" data-depth="expert">
         <p class="kicker">Exhibit 6</p>
         <h2 id="wild-h">ε in the wild</h2>
         <p class="lede">
@@ -599,9 +663,40 @@
         </div>
       </section>
 
+      <section class="section" id="exit" aria-labelledby="exit-h">
+        <p class="kicker">Exit challenge</p>
+        <h2 id="exit-h">Four situations this page has not shown you</h2>
+        <p class="lede">
+          The recap above lists what you watched happen. This asks whether the model travels. None of these four
+          scenarios appears anywhere else on the page — different organisations, different queries, a release pattern
+          the exhibits never ran — so recalling this page's wording will not get you through them. Answer without
+          scrolling back up; each wrong answer names the one interaction that establishes what it tested.
+        </p>
+
+        <div id="exit-readiness"></div>
+        <div id="exit-questions"></div>
+        <div id="exit-result" role="status" aria-live="polite"></div>
+      </section>
+
       <section class="section" id="scope" aria-labelledby="scope-h">
         <p class="kicker">Honest scoping</p>
         <h2 id="scope-h">What this demo does and does not prove</h2>
+        <p class="lede">
+          This section is on both routes and nothing in it is collapsed, because a page that stages its limitations
+          the way it stages its explanations is not being honest, it is being tidy. If you read only one paragraph of
+          it, read this one:
+        </p>
+        <p class="lede lede--strong">
+          The mechanisms here are real and exactly sampled, and the ε bound is <em>computed</em> rather than proved —
+          over the outputs examined, which is evidence and not a theorem. Differential privacy is a statistical
+          guarantee about an <em>individual</em>, not a cryptographic one and not a guarantee about a population. The
+          payroll query is released on a coarse lattice, an approximation the panel discloses wherever it applies. And
+          none of this is production code.
+        </p>
+        <p class="note">
+          The eight cards below are that paragraph in full, one claim at a time — what is genuinely real here, what is
+          approximated, what is offered only as a labelled counter-example, and what was never built at all.
+        </p>
         <div class="grid grid--2">
           <div class="card">
             <h3>Real here</h3>

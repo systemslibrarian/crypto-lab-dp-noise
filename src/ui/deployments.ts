@@ -17,7 +17,7 @@
 import { worstCasePosterior } from '../dp/mechanism';
 import { DEPLOYMENTS, type Deployment } from '../dp/params';
 import { zcdpToDpStandard, zcdpToDpTight } from '../dp/zcdp';
-import { chart, legend } from './chart';
+import { chart, chartData, legend } from './chart';
 import { byId, clear, el, num, pct, scroller, stat, statRow } from './dom';
 
 const PROVENANCE_LABEL: Record<Deployment['provenance'], string> = {
@@ -54,6 +54,25 @@ function renderChart(): void {
       yTickFormat: (v) => num(v, v < 10 ? 1 : 0),
     }),
     legend([{ label: 'ε as deployed (higher means weaker)', style: 'a', kind: 'bars' }]),
+    chartData({
+      caption: 'Each deployment’s ε, the ratio it permits, and the belief bound it implies from an even prior.',
+      headers: ['Deployment', 'ε', 'e^ε', 'Belief can reach', 'Provenance'],
+      rows: sorted.map((d) => [
+        d.org,
+        num(d.eps, 2),
+        d.eps > 12 ? Math.exp(d.eps).toExponential(2) : num(Math.exp(d.eps), 1),
+        pct(worstCasePosterior(0.5, d.eps), 2),
+        PROVENANCE_LABEL[d.provenance],
+      ]),
+      trend:
+        'The ε column spans about an order of magnitude and the e^ε column spans seven, because the quantity ε bounds ' +
+        'is exponential in it.',
+      notice:
+        'The e^ε column is the one to read. A ratio of 24 million bounds nothing an ordinary reader would call ' +
+        'privacy, and yet every row here is a real system described as differentially private — so "we use ' +
+        'differential privacy" is a statement about a technique, not about a guarantee. Then read the provenance ' +
+        'column, because a published ε, a measured one and a derived one are three different kinds of claim.',
+    }),
     el('p', {
       class: 'note',
       text:

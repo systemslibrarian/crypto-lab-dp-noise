@@ -12,16 +12,17 @@
  * un-released, so the only fail-closed behaviour is to not make it.
  */
 import { averagingAttack } from '../dp/attack';
-import { advancedComposition, basicComposition, Ledger, type Spend } from '../dp/composition';
+import { advancedComposition, basicComposition, type Spend } from '../dp/composition';
 import { EMPLOYEES, queryById, sumSalary } from '../dp/database';
 import { laplaceScale, release, type MechanismSpec } from '../dp/mechanism';
 import { epsAt, EPS_LADDER } from '../dp/params';
-import { cryptoRng } from '../dp/rng';
-import { chart, legend } from './chart';
-import { byId, chunked, clear, compactMoney, el, money, num, scroller, stat, statRow, verdict } from './dom';
+import { chart, chartData, legend } from './chart';
+import { byId, chunked, clear, compactMoney, el, layered, money, num, scroller, stat, statRow, verdict } from './dom';
+import { charge, DELTA_PRIME, onLedgerChange, resetLedger, sessionLedger, setBudget } from './ledger';
+import { randomnessNote, sharedRng } from './random';
+import { complete } from './state';
 
-const rng = cryptoRng();
-const DELTA_PRIME = 1e-6;
+const rng = sharedRng();
 
 const GRID_STEPS: Record<string, number> = { 'count-high': 1, headcount: 1, 'sum-salary': 50 };
 
@@ -38,8 +39,19 @@ const ASKABLE: readonly Askable[] = [
   { id: 'ask-sum', queryId: 'sum-salary', eps: '0.5', label: 'Total payroll' },
 ];
 
-let ledger = new Ledger(1.5, DELTA_PRIME);
 const answers: { label: string; value: string; eps: number }[] = [];
+
+/**
+ * Both halves of the budget lesson, tracked separately. The core idea is not
+ * "averaging works" and not "the ledger refuses" — it is that the second exists
+ * because of the first, so the step is only established once the reader has
+ * seen both.
+ */
+const budgetLesson = { averaged: false, refused: false };
+
+function noteBudgetProgress(): void {
+  if (budgetLesson.averaged && budgetLesson.refused) complete('budget');
+}
 
 function specFor(queryId: string, epsText: string): MechanismSpec {
   const q = queryById(queryId);
@@ -55,7 +67,7 @@ function specFor(queryId: string, epsText: string): MechanismSpec {
 export function initBudget(): void {
   const budgetSelect = byId<HTMLSelectElement>('bud-budget');
   budgetSelect.addEventListener('change', () => {
-    ledger = new Ledger(Number(budgetSelect.value), DELTA_PRIME);
+    setBudget(Number(budgetSelect.value));
     answers.length = 0;
     renderLedger();
   });
@@ -64,10 +76,13 @@ export function initBudget(): void {
     byId(a.id).addEventListener('click', () => ask(a));
   }
   byId('bud-reset').addEventListener('click', () => {
-    ledger.reset();
+    resetLedger();
     answers.length = 0;
     renderLedger();
   });
+
+  // The dial quotes this ledger, so a change made here has to reach it.
+  onLedgerChange(renderLedger);
 
   renderLedger();
   renderCompositionCurve();
@@ -76,23 +91,35 @@ export function initBudget(): void {
 
 function ask(a: Askable): void {
   const q = queryById(a.queryId);
+  const ledger = sessionLedger();
   const spend: Spend = { eps: Number(a.eps), delta: 0, label: a.label };
-  const admitted = ledger.request(spend);
+  const admitted = charge(spend);
   const out = byId('bud-out');
   clear(out);
 
   if (!admitted) {
     const quoted = ledger.quote(spend);
     // Fail closed. No answer is produced, not even a noisier one.
+    budgetLesson.refused = true;
+    noteBudgetProgress();
     out.append(
-      verdict(
-        'bad',
-        'Refused — the budget cannot cover this query',
-        `Answering it would put the charged ε at ${num(quoted.eps, 3)}, past the budget of ${num(ledger.budget, 2)}. ` +
-          `No answer was computed and nothing was released. This is the only fail-closed option available: a release ` +
-          `cannot be taken back, so a mechanism that is out of budget has to stop answering, not answer more carefully. ` +
-          `Reset the ledger, or raise the budget and accept what that means.`,
-      ),
+      layered('bad', 'Refused — the budget cannot cover this query', {
+        observation:
+          `Answering would put the charged ε at ${num(quoted.eps, 3)}, past the budget of ${num(ledger.budget, 2)}, ` +
+          `so no answer was computed and nothing was released.`,
+        meaning:
+          'This is the only fail-closed option available. A release cannot be taken back, so a mechanism that is out ' +
+          'of budget has to stop answering — not answer more carefully, not answer with a warning attached. The ' +
+          'refusal is the security control; the ledger above it is only the bookkeeping that makes the refusal possible.',
+        details: [
+          'Answering "more noisily instead" is the tempting alternative and it does not work. The budget is already ' +
+            'spent; a further release adds further loss whatever its ε, and the composed total still exceeds what ' +
+            'was promised. There is no noise level at which an over-budget answer becomes free.',
+          'Reset the ledger, or raise the budget — but raising it is a decision about what you are promising people, ' +
+            'not a way to get the answer you wanted. The ε at the top of this exhibit is the whole promise, and ' +
+            'moving it after the fact is how deployments end up publishing a number they cannot defend.',
+        ],
+      }),
     );
     renderLedger();
     return;
@@ -112,7 +139,7 @@ function ask(a: Askable): void {
 }
 
 function renderLedger(): void {
-  const state = ledger.state();
+  const state = sessionLedger().state();
   const mount = byId('bud-ledger');
   clear(mount);
 
@@ -226,6 +253,23 @@ function renderCompositionCurve(): void {
       { label: 'advanced composition — √k, at the cost of a δ′', style: 'b', kind: 'line' },
       { label: 'where advanced starts winning', style: 'ceiling', kind: 'line' },
     ]),
+    chartData({
+      caption: `Total ε charged after k queries at ε = ${perQuery} each, under both composition rules.`,
+      headers: ['Queries asked', 'Basic', 'Advanced', 'Cheaper rule'],
+      rows: [1, 2, 5, 10, 20, 50, 100, 200, 400].map((k) => {
+        const b = basic[k - 1][1];
+        const a = advanced[k - 1][1];
+        return [String(k), num(b, 3), num(a, 3), a < b ? 'advanced' : 'basic'];
+      }),
+      trend:
+        `Basic grows linearly and advanced grows as √k from a higher starting point, so advanced is more expensive ` +
+        `until k = ${crossover} and cheaper after it.`,
+      notice:
+        `Read the last column down the table. Neither rule is simply better, and the point at which they swap is a ` +
+        `property of the per-query ε and the δ′ you are willing to accept — not a constant. A ledger that hard-coded ` +
+        `either rule would overcharge in one regime and be invalid in the other, which is why the one above computes ` +
+        `both on every request and bills the cheaper.`,
+    }),
     el('p', {
       class: 'note',
       text:
@@ -282,6 +326,8 @@ function wireAveraging(): void {
       () => {
         button.disabled = false;
         renderAveraging(steps, trueValue, spec, epsEach, n, true);
+        budgetLesson.averaged = true;
+        noteBudgetProgress();
       },
     );
   });
@@ -334,6 +380,31 @@ function renderAveraging(
       { label: 'how far the running average is from the truth', style: 'a', kind: 'line' },
       { label: 'the 1/√n the theory predicts (b√2/√n)', style: 'b', kind: 'line' },
     ]),
+    chartData({
+      caption: 'Error of the running average as queries accumulate, measured against the 1/√n prediction.',
+      headers: ['Queries asked', 'Running average', 'Error', 'Predicted error', 'ε spent'],
+      rows: steps
+        .filter((_, i) => i % Math.max(1, Math.ceil(steps.length / 14)) === 0 || i === steps.length - 1)
+        .map((s) => [
+          num(s.n),
+          money(s.estimate),
+          money(s.absError),
+          money((b * Math.SQRT2) / Math.sqrt(s.n)),
+          num(s.epsSpent, 1),
+        ]),
+      trend:
+        'The error column falls by roughly a factor of ten for every hundredfold increase in queries asked, tracking ' +
+        'the predicted column, while the ε column rises linearly.',
+      notice:
+        'Read the error and the ε columns together. The attacker’s accuracy improves without bound while the privacy ' +
+        'cost rises without bound, and nothing in the mechanism stops either — the only thing that ever stops it is a ' +
+        'budget that refuses. That is the argument for composition accounting, stated as two columns.',
+      sampled:
+        `The "error" column is one real run of the exact sampler and will differ every time; the "predicted" column ` +
+        `is the closed form b√2/√n with b = ${money(b)} and does not vary. Expect the measured column to wander ` +
+        `around the prediction rather than sit on it — a single run that tracked the theory exactly would be the ` +
+        `suspicious outcome.`,
+    }),
   );
 
   const out = byId('avg-out');
@@ -352,15 +423,25 @@ function renderAveraging(
 
   if (finished) {
     out.append(
-      verdict(
-        'bad',
-        `The true payroll is recovered to within ${money(last.absError)}`,
-        `Every one of those ${num(total)} answers was independently differentially private at ε = ${epsEach}. The set ` +
-          `of them is not, because independent noise averages away at 1/√n. What the analyst walks away with is what ` +
-          `matters, and by basic composition they have spent ε = ${num(last.epsSpent, 1)} — a number that describes ` +
-          `essentially no privacy at all. This is the entire reason a budget must be charged and enforced, and why the ` +
-          `ledger above refuses rather than negotiates.`,
-      ),
+      layered('bad', `The true payroll is recovered to within ${money(last.absError)}`, {
+        observation:
+          `${num(total)} answers, each independently differentially private at ε = ${epsEach}, averaged to within ` +
+          `${money(last.absError)} of the true total — against ${money(b)} of typical error on any one of them.`,
+        meaning:
+          `Privacy is a property of what the analyst walks away with, not of the last answer they were handed. ` +
+          `Independent noise averages away at 1/√n, and by basic composition this transcript has spent ` +
+          `ε = ${num(last.epsSpent, 1)} — a number that describes essentially no privacy at all. This is what the ` +
+          `ledger exists to prevent, and why it refuses rather than negotiates.`,
+        details: [
+          `Nothing malfunctioned. Every release was a correct, valid ε = ${epsEach} mechanism, and an auditor ` +
+            `checking any single one of them would find nothing wrong. The failure is entirely in the accounting ` +
+            `around them, which is the part that has no visible symptom until someone runs this attack.`,
+          `Laplace noise has finite variance, so the central limit theorem applies exactly as it would to anything ` +
+            `else; heavy tails slow the convergence at small n and do not stop it. Nor does the discreteness of the ` +
+            `sampler help — the lattice is far finer than the noise, so the average moves continuously.`,
+          randomnessNote(),
+        ],
+      }),
     );
   }
 }

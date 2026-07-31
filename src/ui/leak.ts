@@ -13,10 +13,11 @@ import { EMPLOYEES, HIGH_EARNER_THRESHOLD, sumSalary, TARGET_ID } from '../dp/da
 import { analyse, classOf, LEVELS } from '../dp/kanon';
 import { laplaceScale, type MechanismSpec } from '../dp/mechanism';
 import { epsAt, EPS_LADDER } from '../dp/params';
-import { cryptoRng } from '../dp/rng';
-import { byId, clear, el, money, scroller, stat, statRow, verdict } from './dom';
+import { byId, clear, el, layered, money, scroller, stat, statRow, verdict } from './dom';
+import { randomnessNote, sharedRng } from './random';
+import { complete } from './state';
 
-const rng = cryptoRng();
+const rng = sharedRng();
 
 const DP_EPS_INDEX = EPS_LADDER.indexOf('1');
 
@@ -109,26 +110,48 @@ function wireAttack(): void {
       // The attacker succeeded, so this is an ALARM even though it "worked":
       // colour tracks system integrity here, never the return value.
       out.append(
-        verdict(
-          'bad',
-          `Alice's salary recovered exactly: ${money(first.recovered)}`,
-          `Her real salary is ${money(first.truth)}. The error is zero. Two queries the system was built to answer, ` +
-            `neither of which mentions an individual, and the subtraction is a payslip. This is the failure differential ` +
-            `privacy was defined to close — and note that no amount of care about which aggregates to publish would have helped.`,
-        ),
+        layered('bad', `Alice's salary recovered exactly: ${money(first.recovered)}`, {
+          observation: `Her real salary is ${money(first.truth)}, and the subtraction returned it with an error of zero.`,
+          meaning:
+            'Two queries the system was built to answer, neither of which mentions an individual, and the difference ' +
+            'is a payslip. Publishing only aggregates is not privacy — which is the failure differential privacy was ' +
+            'defined to close.',
+          details: [
+            'Note what would not have helped. Reviewing which aggregates get published does not fix this: both ' +
+              'queries are ones any reasonable review would approve, and the attack needs no side knowledge about the ' +
+              'other eleven people. The problem is not the choice of aggregate, it is that exact answers to overlapping ' +
+              'questions determine their difference.',
+            'Nor does a rule against "small" groups. The attack works at any database size, because it never asks ' +
+              'about a small group — it asks two questions about large ones and subtracts. Restricting queries to ' +
+              'groups above some size is a rule an attacker satisfies trivially.',
+          ],
+        }),
       );
     } else {
       const spread = results.map((r) => r.recovered);
       const errors = results.map((r) => Math.abs(r.error));
       const median = [...errors].sort((a, b) => a - b)[Math.floor(errors.length / 2)];
       out.append(
-        verdict(
-          'ok',
-          `Attack failed — five runs, five different answers`,
-          `Her real salary is ${money(first.truth)}. The typical miss is ${money(median)}, because each answer now ` +
-            `carries Laplace noise at scale b = Δ/ε = ${money(laplaceScale(dpSpec()))}. The attack still runs; it just ` +
-            `stops meaning anything.`,
-        ),
+        layered('ok', 'Attack failed — five runs, five different answers', {
+          observation: `Her real salary is ${money(first.truth)}, and the five runs miss it by about ${money(median)} each.`,
+          meaning:
+            `Each answer now carries Laplace noise at scale b = Δ/ε = ${money(laplaceScale(dpSpec()))}. The attack ` +
+            `still runs — nothing stops the attacker subtracting — it just stops meaning anything, because the ` +
+            `difference of two noisy answers is itself noisy.`,
+          details: [
+            'The noise is calibrated to the declared salary range, not to what anyone actually earns. A sensitivity ' +
+              'read off the observed data would itself be a function of the data and would leak it — the exercise in ' +
+              'Exhibit 4 makes that choice explicitly.',
+            // The attack is two queries, so it is two charges. Saying so here
+            // stops the DP-mode panel reading as though privacy became free the
+            // moment it started working.
+            `Note what this cost. The attack asks two questions, so it spends twice: ε = 1 each, ε = 2 in total by ` +
+              `basic composition. Against the strict budget in Exhibit 5 that is more than the whole session, and the ` +
+              `ledger there would refuse the second query outright. Failing to recover Alice's salary is not the same ` +
+              `as the attack being harmless — it stopped working because someone paid for it to.`,
+            randomnessNote(),
+          ],
+        }),
         el('ul', { class: 'chip-row', 'aria-label': 'Five independent runs of the same attack' },
           spread.map((v, i) =>
             el('li', { class: 'chip' }, [
@@ -137,14 +160,10 @@ function wireAttack(): void {
             ]),
           ),
         ),
-        el('p', {
-          class: 'note',
-          text:
-            'The noise is calibrated to the declared salary range, not to what anyone actually earns — a sensitivity ' +
-            'read off the data would itself leak the data.',
-        }),
       );
     }
+    // Established by running it, in either mode: the contrast is the lesson.
+    complete('differencing');
   };
 
   byId('leak-run').addEventListener('click', run);
@@ -217,24 +236,44 @@ function wireAnonymity(): void {
 
     if (cls?.homogeneous) {
       out.append(
-        verdict(
-          'bad',
-          `${report.k}-anonymous, and Alice's salary band is still disclosed`,
-          `An attacker who knows only that Alice is ${cls.age === 'any' ? '' : `aged ${cls.age}, `}in ` +
-            `${cls.dept.toLowerCase()} and in ZIP ${cls.zip} finds her class. Every one of its ${cls.members.length} ` +
-            `members ${cls.leaked}, so she does too. The k guarantee is intact and the sensitive value fell out anyway — that ` +
-            `is the homogeneity attack, and it is why the field stopped constraining the released table and started ` +
-            `constraining the mechanism.`,
-        ),
+        layered('bad', `${report.k}-anonymous, and Alice's salary band is still disclosed`, {
+          observation:
+            `An attacker who knows only that Alice is ${cls.age === 'any' ? '' : `aged ${cls.age}, `}in ` +
+            `${cls.dept.toLowerCase()} and in ZIP ${cls.zip} finds her class, and every one of its ` +
+            `${cls.members.length} members ${cls.leaked}.`,
+          meaning:
+            'The k guarantee is fully intact and the sensitive value fell out anyway. That is the homogeneity ' +
+            'attack, and it is why the field stopped constraining the released table and started constraining the ' +
+            'mechanism that produces the answers.',
+          details: [
+            'k-anonymity constrains how many records share a set of quasi-identifiers. It says nothing whatever ' +
+              'about whether those records agree on the sensitive attribute — and correlation between the two is the ' +
+              'normal case, not the unlucky one. People who share a department and an age band tend to share a pay ' +
+              'band; that is what departments and pay scales are.',
+            'Raising k does not fix it and can make it worse, because larger classes are built by generalising ' +
+              'harder, which groups more similar people together. The measured k rises, the disclosure stays, and ' +
+              'the metric reports success throughout. Machanavajjhala et al. (2007) proposed ℓ-diversity as a ' +
+              'repair, and it is patched again by t-closeness — a pattern of repairs to a definition that was ' +
+              'never quantifying over what an attacker already knew.',
+          ],
+        }),
       );
     } else {
       out.append(
-        verdict(
-          'warn',
-          `${report.k}-anonymous, and Alice's class is mixed`,
-          'Her band is not disclosed at this generalisation — but nothing about k guaranteed that. It is luck, and the ' +
-            'other classes in the table are still unanimous.',
-        ),
+        layered('warn', `${report.k}-anonymous, and Alice's class is mixed`, {
+          observation:
+            'Her band is not disclosed at this generalisation — her equivalence class contains people on both ' +
+            'sides of the threshold.',
+          meaning:
+            'Nothing about k guaranteed that. It is luck: the same k with a different distribution of salaries ' +
+            'discloses her, and other classes in this very table are still unanimous. A guarantee that holds by ' +
+            'accident is not one you can promise anybody.',
+          details: [
+            'This is the sharpest version of the argument, because the metric is being met and the outcome is ' +
+              'still not under anyone’s control. Change one salary in the table and the disclosure returns without ' +
+              'k moving at all — so k is not measuring the thing that matters, even when the news is good.',
+          ],
+        }),
       );
     }
 

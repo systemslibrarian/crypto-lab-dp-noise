@@ -341,6 +341,53 @@ export function legend(entries: readonly LegendEntry[]): HTMLElement {
   );
 }
 
+export interface ChartDataOptions {
+  /** The disclosure's label. Defaults to the wording used across the page. */
+  readonly summary?: string;
+  readonly caption: string;
+  readonly headers: readonly string[];
+  readonly rows: readonly (readonly string[])[];
+  /** The shape of the data, in one sentence. */
+  readonly trend: string;
+  /** The exact thing the reader is meant to take from this chart. */
+  readonly notice: string;
+  /**
+   * For charts carrying both a simulation and a closed form: which marks are
+   * which. A reader who cannot tell a sampled bar from a theoretical curve is
+   * being invited to read a finite experiment as a proof.
+   */
+  readonly sampled?: string;
+}
+
+/**
+ * The accessible twin of a chart: its values, its trend, and what it is for.
+ *
+ * An `aria-label` saying "a chart of error against queries asked" is a
+ * description of a picture, not access to a finding. Every instructional chart
+ * on this page carries one of these instead, so that a reader who cannot use
+ * the SVG — screen reader, greyscale, no pointer, or simply preferring numbers —
+ * reaches the same conclusion from the same data rather than a summary of it.
+ */
+export function chartData(o: ChartDataOptions): HTMLElement {
+  const prose = el('div', { class: 'chart-data__prose' }, [
+    el('p', {}, [el('strong', { text: 'The trend. ' }), document.createTextNode(o.trend)]),
+    el('p', {}, [el('strong', { text: 'What to notice. ' }), document.createTextNode(o.notice)]),
+  ]);
+  if (o.sampled) {
+    prose.append(
+      el('p', { class: 'note' }, [
+        el('strong', { text: 'Sampled versus theoretical. ' }),
+        document.createTextNode(o.sampled),
+      ]),
+    );
+  }
+  return el('details', { class: 'data-details' }, [
+    el('summary', { text: o.summary ?? 'Data and interpretation' }),
+    prose,
+    scroller(o.caption, table(o.caption, o.headers, o.rows)),
+  ]);
+}
+
 /** The numbers a chart was drawn from, as a real table behind a disclosure. */
 export function dataTable(
   summary: string,
@@ -348,7 +395,18 @@ export function dataTable(
   headers: readonly string[],
   rows: readonly (readonly string[])[],
 ): HTMLElement {
-  const table = el('table', { class: 'data-table' }, [
+  return el('details', { class: 'data-details' }, [
+    el('summary', { text: summary }),
+    scroller(caption, table(caption, headers, rows)),
+  ]);
+}
+
+function table(
+  caption: string,
+  headers: readonly string[],
+  rows: readonly (readonly string[])[],
+): HTMLElement {
+  return el('table', { class: 'data-table' }, [
     el('caption', { text: caption }),
     el('thead', {}, [el('tr', {}, headers.map((h) => el('th', { scope: 'col', text: h })))]),
     el(
@@ -358,9 +416,5 @@ export function dataTable(
         el('tr', {}, r.map((c, i) => el(i === 0 ? 'th' : 'td', i === 0 ? { scope: 'row', text: c } : { text: c }))),
       ),
     ),
-  ]);
-  return el('details', { class: 'data-details' }, [
-    el('summary', { text: summary }),
-    scroller(caption, table),
   ]);
 }

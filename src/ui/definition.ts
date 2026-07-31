@@ -18,10 +18,12 @@ import { discreteGaussianPmf, discreteLaplacePmf } from '../dp/discrete';
 import { analyticSigma } from '../dp/gaussian';
 import { logRatio, optimalGuessRate, ratioCurve, type CurveSpec } from '../dp/guarantee';
 import { worstCasePosterior } from '../dp/mechanism';
-import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER, epsLabel } from '../dp/params';
+import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER } from '../dp/params';
 import { toNumber } from '../dp/rational';
-import { chart, dataTable, legend, type Series } from './chart';
-import { byId, clear, el, num, pct, ratio, stat, statRow, verdict } from './dom';
+import { chart, chartData, legend, type Series } from './chart';
+import { byId, clear, el, layered, num, pct, ratio, stat, statRow } from './dom';
+import { bindEpsSlider } from './link';
+import { complete } from './state';
 
 const DELTA = 1e-5;
 
@@ -47,8 +49,10 @@ export function initDefinition(): void {
   const mech = byId<HTMLSelectElement>('def-mech');
   slider.max = String(EPS_LADDER.length - 1);
   slider.value = String(EPS_DEFAULT_INDEX);
+  /** The ε this exhibit opened at, so "the reader moved it" is a real event. */
+  const startedAt = Number(slider.value);
 
-  const render = (): void => {
+  const render = (source: 'reader' | 'sync' = 'sync'): void => {
     const eps = toNumber(epsAt(Number(slider.value)));
     const gaussian = mech.value === 'gaussian';
     // Sensitivity is 1 here — one person changes a count by one — so σ and the
@@ -75,14 +79,23 @@ export function initDefinition(): void {
       },
     };
 
-    byId('def-eps-value').textContent = epsLabel(Number(slider.value));
     renderDistributions(view, half);
     renderRatio(view, half);
     renderReadout(view);
+    // Established by *this reader moving this ε* — not by the exhibit rendering
+    // at its default, and not by a linked ε arriving from the dial. Linking
+    // propagates the value; it does not propagate having understood it.
+    //
+    // The condition is exactly the action the navigator prints for this step.
+    // Switching to the Gaussian is also real engagement with the exhibit, and
+    // it deliberately does not count: a navigator that says "Do: move ε" and
+    // then ticks itself off for something else has stopped meaning anything.
+    if (source === 'reader' && Number(slider.value) !== startedAt) complete('definition');
   };
 
-  slider.addEventListener('input', render);
-  mech.addEventListener('change', render);
+  // Owns the ε label and the shared-ε handshake; this module only draws.
+  bindEpsSlider(slider, 'def-eps-value', render);
+  mech.addEventListener('change', () => render('sync'));
   render();
 }
 
@@ -120,6 +133,23 @@ function renderDistributions(view: DefinitionView, half: number): void {
       { label: `Alice is in the database — true answer ${WITH_ALICE}`, style: 'a', kind: 'steps' },
       { label: `Alice is not — true answer ${WITHOUT_ALICE}`, style: 'b', kind: 'steps' },
     ]),
+    chartData({
+      caption: `Probability of each released answer under both databases, at ε = ${view.eps}.`,
+      headers: ['Released answer', 'Pr with Alice', 'Pr without Alice', 'Difference'],
+      rows: a
+        .map(([x, p], i) => [x, p, b[i][1]] as const)
+        .filter(([, p, q]) => p > 1e-6 || q > 1e-6)
+        .slice(0, 60)
+        .map(([x, p, q]) => [String(x), p.toExponential(3), q.toExponential(3), (p - q).toExponential(2)]),
+      trend:
+        `Two distributions of the same shape, offset by one — the single person’s worth of difference between the ` +
+        `databases — each spreading further as ε falls.`,
+      notice:
+        `Compare the two probability columns row by row. The question the definition asks is not whether the curves ` +
+        `look similar but whether any single row lets you tell them apart, and at ε = ${view.eps} the largest ` +
+        `difference between them is ${Math.max(...a.map(([, p], i) => Math.abs(p - b[i][1]))).toExponential(2)}. ` +
+        `The next chart turns that comparison into the ratio the definition actually bounds.`,
+    }),
   );
 }
 
@@ -164,11 +194,10 @@ function renderRatio(view: DefinitionView, half: number): void {
 
   const worst = shown.reduce((best, p) => (p.ratio > best.ratio ? p : best), shown[0]);
   mount.append(
-    dataTable(
-      'The numbers behind these charts',
-      'Probability of each released answer under both databases, and the ratio between them.',
-      ['Released answer', 'Pr with Alice', 'Pr without Alice', 'Ratio'],
-      shown
+    chartData({
+      caption: 'Probability of each released answer under both databases, and the ratio between them.',
+      headers: ['Released answer', 'Pr with Alice', 'Pr without Alice', 'Ratio', 'ln(ratio)'],
+      rows: shown
         .filter((p) => p.withTarget > 1e-6 || p.withoutTarget > 1e-6)
         .slice(0, 60)
         .map((p) => [
@@ -176,8 +205,22 @@ function renderRatio(view: DefinitionView, half: number): void {
           p.withTarget.toExponential(3),
           p.withoutTarget.toExponential(3),
           p.ratio.toFixed(4),
+          logRatio(view.spec, p.x).toFixed(4),
         ]),
-    ),
+      trend: view.gaussian
+        ? `The log-ratio column is a straight line in the released answer: it passes ε = ${view.eps} and keeps ` +
+          `climbing, with no output at which it levels off.`
+        : `The log-ratio column takes exactly two values away from the step — −${view.eps} below the shift and ` +
+          `+${view.eps} above it — and never anything larger.`,
+      notice: view.gaussian
+        ? `Find the first row where the last column exceeds ${view.eps}. Everything from there outward is an output ` +
+          `at which the ε promise is false, and δ = ${curve.deltaNeeded.toExponential(2)} is the total probability ` +
+          `of landing in that region. That is what δ buys and all it buys.`
+        : `Read the last column, not the shape. It saturates at ±${view.eps} and stays there, which is the ` +
+          `definition being met with equality at every output — a tight ε rather than a merely respected one. The ` +
+          `largest ratio anywhere in the examined range is ${ratio(curve.maxRatio)} against a ceiling of ` +
+          `e^ε = ${ratio(curve.ceiling)}.`,
+    }),
   );
 
   renderVerdict(view, curve, worst.x);
@@ -192,16 +235,25 @@ function renderVerdict(
   clear(out);
   if (!view.gaussian) {
     out.append(
-      verdict(
-        'ok',
-        `The rails hold — and they are tight`,
-        `Across every output examined, the largest ratio is ${ratio(curve.maxRatio)}, against a ceiling of ` +
-          `e^ε = ${ratio(curve.ceiling)}, and it is reached at every single output on the axis — including ${worstX}. ` +
-          `Notice what the log-ratio does: it steps from −ε straight to +ε and then stays there, flat, forever. That ` +
-          `flatness is the mechanism spending exactly the privacy it was budgeted at every possible answer and no ` +
-          `more, which is what makes the Laplace mechanism the right shape for pure ε-DP. No δ is needed: the ` +
-          `probability mass by which the promise is broken is ${curve.deltaNeeded.toExponential(1)}.`,
-      ),
+      layered('ok', 'The rails hold — and they are tight', {
+        observation:
+          `The log-ratio steps from −ε to +ε and then stays flat, touching the rails at every output on the axis, ` +
+          `including ${worstX}.`,
+        meaning:
+          `That flatness is the promise being met with equality rather than slack: the largest ratio anywhere is ` +
+          `${ratio(curve.maxRatio)} against a ceiling of e^ε = ${ratio(curve.ceiling)}, so no output leaks more than ` +
+          `ε allows and none leaks less than ε was paid for. ε bounds this ratio — it is not a quantity of noise.`,
+        details: [
+          `No δ is needed here, and the page computes that rather than asserting it: the total probability mass on ` +
+            `outputs where the ε promise fails is ${curve.deltaNeeded.toExponential(1)}. Pure ε-DP means exactly ` +
+            `this number is zero, and the discrete Laplace mechanism achieves it because its density falls off as a ` +
+            `plain exponential in both directions, which is the one shape whose log-ratio saturates instead of growing.`,
+          `The bound is checked far beyond the range drawn — over ${curve.points.length} outputs rather than the few ` +
+            `dozen on screen — because "the ceiling holds" would otherwise only mean "the ceiling holds where we ` +
+            `happened to look". It is still a computation over the outputs examined, not a proof of the theorem; the ` +
+            `honest-scoping section says so.`,
+        ],
+      }),
     );
   } else {
     // σ is calibrated with Balle & Wang's closed form for the *continuous*
@@ -211,19 +263,28 @@ function renderVerdict(
     const gap = curve.deltaNeeded / DELTA;
     const over = gap > 1;
     out.append(
-      verdict(
-        'warn',
-        'The rails do not hold — this is why δ exists',
-        `The log-ratio is a straight line: it crosses +ε, keeps climbing, and would cross any rail you drew. A ` +
-          `Gaussian tail falls faster than any exponential, so no pure ε can bound it — over the range examined the ` +
-          `ratio reaches ${ratio(curve.maxRatio)}. The repair is (ε, δ): the total probability by which the promise ` +
-          `is broken, summed over every output where it breaks, is ${curve.deltaNeeded.toExponential(2)}. ` +
-          `σ = ${num(view.sigma, 2)} was calibrated for δ = ${DELTA.toExponential(0)} — but calibrated for the ` +
-          `*continuous* Gaussian, using Balle & Wang's closed form, and then handed to the discrete sampler. The two ` +
-          `are close, not equal: the discrete mechanism here needs ${pct(Math.abs(gap - 1), 1)} ${over ? 'more' : 'less'} ` +
-          `δ than the calibration targeted. Re-deriving the discrete mechanism's own accounting is Canonne–Kamath–Steinke's ` +
-          `job, not this page's, and the scoping section says so.`,
-      ),
+      layered('warn', 'The rails do not hold — this is why δ exists', {
+        observation:
+          `The log-ratio is a straight line: it crosses +ε, keeps climbing, and would cross any rail you drew, ` +
+          `reaching ${ratio(curve.maxRatio)} over the range examined.`,
+        meaning:
+          `A Gaussian tail falls faster than any exponential, so no pure ε can bound this ratio everywhere. The ` +
+          `repair is (ε, δ): δ = ${curve.deltaNeeded.toExponential(2)} is the total probability of landing on an ` +
+          `output where the ε promise is simply false — not a little extra privacy loss, but the mass where there is ` +
+          `no promise at all.`,
+        details: [
+          `σ = ${num(view.sigma, 2)} was calibrated for δ = ${DELTA.toExponential(0)} using Balle & Wang's analytic ` +
+            `Gaussian mechanism — but that closed form is for the *continuous* Gaussian, and the σ it returns is then ` +
+            `handed to the discrete sampler. The two are close, not equal: the discrete mechanism here needs ` +
+            `${pct(Math.abs(gap - 1), 1)} ${over ? 'more' : 'less'} δ than the calibration targeted. The page reports ` +
+            `the gap and its direction rather than claiming the target was met.`,
+          `Re-deriving the discrete Gaussian's own accounting is Canonne–Kamath–Steinke's job, not this page's. What ` +
+            `the test suite does instead is a cross-check: the δ needed by the discrete PMF must agree with the ` +
+            `continuous closed form to within 10%. That is evidence the calibration is not badly wrong, and it is not ` +
+            `a re-derivation. The honest-scoping section lists it as such.`,
+        ],
+        detailsLabel: 'Why the details matter — the calibration gap, stated rather than smoothed over',
+      }),
     );
   }
 }
@@ -258,15 +319,25 @@ function renderReadout(view: DefinitionView): void {
   );
   if (!view.gaussian) {
     out.append(
-      el('p', {
-        class: 'note',
-        text:
-          'Those last two numbers are identical, and that is not a rendering slip. The total variation distance ' +
-          'between two discrete Laplace distributions one step apart is exactly tanh(ε/2), and (1 + tanh(ε/2))/2 is ' +
-          'exactly e^ε/(1 + e^ε). So this mechanism is tight in both senses at once: it hits the likelihood-ratio ' +
-          'ceiling at every output, and an optimal attacker collects the entire belief budget ε allows. The test ' +
-          'suite asserts the equality at every stop on the ladder.',
-      }),
+      el('details', { class: 'data-details' }, [
+        el('summary', { text: 'Those last two numbers are identical — why that is not a rendering slip' }),
+        el('p', {
+          text:
+            'The total variation distance between two discrete Laplace distributions one step apart is exactly ' +
+            'tanh(ε/2). An optimal attacker distinguishing two equally likely worlds succeeds with probability ' +
+            '(1 + TV)/2, so their best rate is (1 + tanh(ε/2))/2 — which is algebraically identical to the belief ' +
+            'bound e^ε/(1 + e^ε).',
+        }),
+        el('p', {
+          text:
+            'So this mechanism is tight in both senses at once: it attains the likelihood-ratio ceiling at every ' +
+            'single output, and an optimal attacker collects the entire belief budget ε permits. Neither is true of ' +
+            'the Gaussian, where the ratio is unbounded and the attacker does correspondingly better in the tails. ' +
+            'The test suite asserts the equality at every stop on the ε ladder, so a change to either derivation ' +
+            'that broke the correspondence would fail the build rather than quietly print two numbers that no ' +
+            'longer mean the same thing.',
+        }),
+      ]),
     );
   }
 }

@@ -33,13 +33,16 @@ import {
   type MechanismKind,
   type MechanismSpec,
 } from '../dp/mechanism';
-import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER, epsLabel } from '../dp/params';
+import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER } from '../dp/params';
 import { toNumber } from '../dp/rational';
-import { cryptoRng } from '../dp/rng';
-import { chart, legend } from './chart';
-import { byId, clear, compactMoney, el, money, num, pct, signed, stat, statRow, verdict } from './dom';
+import { chart, chartData, legend } from './chart';
+import { byId, clear, compactMoney, el, layered, money, num, pct, signed, stat, statRow, verdict } from './dom';
+import { quote } from './ledger';
+import { bindEpsSlider } from './link';
+import { randomnessNote, sharedRng } from './random';
+import { complete, update } from './state';
 
-const rng = cryptoRng();
+const rng = sharedRng();
 const DELTA = 1e-5;
 
 /** How many lattice steps the sensitivity spans, per query. */
@@ -97,15 +100,29 @@ export function initDial(): void {
   slider.max = String(EPS_LADDER.length - 1);
   slider.value = String(EPS_DEFAULT_INDEX);
 
+  /**
+   * "Compare the headcount and the payroll at the same ε" is only comparing if
+   * two different queries have actually been on screen, so the step is earned
+   * by the set of queries seen rather than by any single selection — and only
+   * when they differ in sensitivity, since the two Δ = 1 queries teach nothing
+   * about Δ.
+   */
+  const seen = new Set<string>([querySelect.value]);
+
   const render = (): void => {
-    byId('dial-eps-value').textContent = epsLabel(Number(slider.value));
     const spec = specFor(querySelect.value, Number(slider.value), mechSelect.value as MechanismKind);
     renderReadout(spec, querySelect.value);
     renderCurve(querySelect.value, mechSelect.value as MechanismKind, Number(slider.value));
   };
 
-  for (const control of [querySelect, mechSelect]) control.addEventListener('change', render);
-  slider.addEventListener('input', render);
+  querySelect.addEventListener('change', () => {
+    seen.add(querySelect.value);
+    update({ queryId: querySelect.value });
+    if (new Set([...seen].map((id) => queryById(id).sensitivity)).size > 1) complete('sensitivity');
+    render();
+  });
+  mechSelect.addEventListener('change', render);
+  bindEpsSlider(slider, 'dial-eps-value', render);
 
   byId('dial-release').addEventListener('click', () => {
     const spec = specFor(querySelect.value, Number(slider.value), mechSelect.value as MechanismKind);
@@ -153,31 +170,58 @@ function renderReadout(spec: MechanismSpec, queryId: string): void {
 
   out.append(el('p', { class: 'note', text: `Where Δ comes from: ${q.sensitivityWhy}` }));
 
+  // A real approximation, so it is disclosed wherever it applies — but it is
+  // an implementation caveat rather than part of the lesson, so it is staged
+  // behind a summary that says plainly that it is there.
   if (lat.rounds && (spec.kind === 'discrete-laplace' || spec.kind === 'discrete-gaussian')) {
     out.append(
-      el('p', {
-        class: 'note',
-        text:
-          `This query is released on a lattice of ${money(lat.grid)}: the exact integer sampler would need about ` +
-          `Δ/ε geometric trials per draw at Δ = ${money(q.sensitivity)}, which is minutes rather than milliseconds. ` +
-          `The true answer is rounded onto that lattice first — if it were not, the two neighbouring databases would ` +
-          `land on two different lattices, their supports would be disjoint, and the ratio would be infinite rather ` +
-          `than e^ε. Rounding costs one lattice step of sensitivity, so the sampler is driven at ε/${lat.shift}, not ε/${lat.shift - 1}.`,
-      }),
+      el('details', { class: 'data-details' }, [
+        el('summary', {
+          text: `This query is released on a ${money(lat.grid)} lattice — an approximation, and what it costs`,
+        }),
+        el('p', {
+          text:
+            `The exact integer sampler needs about Δ/ε geometric trials per draw, and at Δ = ${money(q.sensitivity)} ` +
+            `that is minutes rather than milliseconds. So released answers are placed on a lattice of ` +
+            `${money(lat.grid)} instead.`,
+        }),
+        el('p', {
+          text:
+            `The true answer is rounded onto that lattice first, and that step is not cosmetic. Without it the two ` +
+            `neighbouring databases would land on two different lattices, their supports would be disjoint, and the ` +
+            `likelihood ratio would be infinite rather than e^ε — no privacy at all, from something that looks like ` +
+            `a rendering detail.`,
+        }),
+        el('p', {
+          text:
+            `Rounding costs one lattice step of sensitivity, because two nearby values can round to points one step ` +
+            `further apart than they started. The sampler is therefore driven at ε/${lat.shift} rather than ` +
+            `ε/${lat.shift - 1}: conservative on purpose, so the released answer is slightly noisier than strictly ` +
+            `required and never slightly less private.`,
+        }),
+      ]),
     );
   }
 
   if (spec.kind === 'continuous-laplace') {
     out.append(
-      verdict(
-        'warn',
-        'Textbook mode — this is the sampler Mironov broke',
-        'Sampling Laplace noise as b·ln(u) over a double-precision uniform gives a distribution with gaps and ' +
-          'duplicated masses whose low bits depend on the true answer. Mironov (CCS 2012) turns those artefacts into ' +
-          'a recovery attack. It is here because it is what almost every tutorial implements, and because seeing it ' +
-          'named is the only way to know not to ship it. The other two modes on this control draw only exact rational ' +
-          'Bernoullis and never touch a float.',
-      ),
+      layered('warn', 'Textbook mode — this is the sampler Mironov broke', {
+        observation:
+          'The noise is now drawn as b·ln(u) over a double-precision uniform, which is what nearly every tutorial ' +
+          'implementation of the Laplace mechanism does.',
+        meaning:
+          'That is not the Laplace distribution. It is one with gaps and duplicated masses whose low-order bits ' +
+          'depend on the true answer, and Mironov (CCS 2012) turns those artefacts into an attack that recovers it. ' +
+          'The mode is offered because seeing it named is the only reliable way to know not to ship it.',
+        details: [
+          'The failure is entirely in the sampler, not in the mathematics: the calibration b = Δ/ε is correct, the ' +
+            'ε is correct, and the mechanism is still broken. This is why "is it differentially private?" is not a ' +
+            'question about a formula — a mechanism is only as private as the code that samples it.',
+          'The two discrete modes on this control compare exact integers and never touch a float: the Laplace as a ' +
+            'difference of two geometrics and the Gaussian by Canonne–Kamath–Steinke rejection, both driven by ' +
+            'rational Bernoulli draws from crypto.getRandomValues.',
+        ],
+      }),
     );
   } else if (spec.kind === 'exact') {
     out.append(
@@ -198,6 +242,7 @@ function renderRelease(spec: MechanismSpec, queryId: string): void {
   const fmt = (v: number): string => (asMoney ? money(v) : num(v, Number.isInteger(v) ? 0 : 2));
 
   const rows = Array.from({ length: 6 }, () => release(rng, spec, trueValue));
+  const eps = toNumber(spec.eps);
   const out = byId('dial-release-out');
   clear(out);
   out.append(
@@ -214,6 +259,27 @@ function renderRelease(spec: MechanismSpec, queryId: string): void {
       ),
     ),
   );
+
+  // A release is never free, and a panel that shows six of them without saying
+  // so teaches that it is. This exhibit quotes rather than charges — a reader
+  // comparing mechanisms is not running an attack and should not be locked out
+  // of the page for exploring — but the price is always on screen.
+  if (spec.kind !== 'exact') {
+    const cost = quote(eps, q.label);
+    out.append(
+      el('p', { class: 'note' }, [
+        el('strong', { text: 'What this would cost. ' }),
+        document.createTextNode(
+          `Six releases of this query at ε = ${eps} is six charges, not one: ${num(6 * eps, 2)} of privacy budget ` +
+            `by basic composition. Billed against the session ledger in Exhibit 5, a single one of them would take ` +
+            `the total to ${num(cost.total, 3)} of ${num(cost.budget, 2)}` +
+            `${cost.wouldRefuse ? ' — which is over budget, so the ledger would refuse it outright' : ''}. This panel ` +
+            `quotes the price rather than charging it, so that comparing mechanisms does not exhaust the budget; the ` +
+            `ledger is where enforcement actually happens.`,
+        ),
+      ]),
+    );
+  }
 
   // Noise is symmetric and unbounded, so a count can come back negative and a
   // payroll can come back below zero. That is not a bug, and hiding it would be
@@ -233,6 +299,8 @@ function renderRelease(spec: MechanismSpec, queryId: string): void {
       }),
     );
   }
+
+  out.append(el('p', { class: 'note', text: randomnessNote() }));
 }
 
 function renderMean(epsIndex: number, kind: MechanismKind): void {
@@ -257,14 +325,27 @@ function renderMean(epsIndex: number, kind: MechanismKind): void {
       ],
       'A mean computed from two released numbers',
     ),
-    verdict(
-      'ok',
-      `Total ε spent: ${toNumber(sumSpec.eps) * 2} — the division was free`,
-      'The average is not a third query. It is arithmetic on two numbers that have already been released, and ' +
-        'differential privacy is closed under post-processing: no function of a released answer can leak more than the ' +
-        'answer already did. That is why a DP system can hand analysts a released table and let them compute whatever ' +
-        'they like on it without any further accounting.',
-    ),
+    layered('ok', `Total ε spent: ${toNumber(sumSpec.eps) * 2} — the division was free`, {
+      observation:
+        'Two releases were charged, one for the payroll total and one for the headcount. The division that turned ' +
+        'them into an average was charged nothing.',
+      meaning:
+        'The average is not a third query. It is arithmetic on two numbers already released, and differential ' +
+        'privacy is closed under post-processing: no function of a released answer can leak more than that answer ' +
+        'already did. This is why a DP system can hand an analyst a released table and leave them alone with it.',
+      details: [
+        'The proof is a one-liner and worth carrying: if f is any function and M is ε-DP, then for any output set S, ' +
+          'Pr[f(M(D)) ∈ S] = Pr[M(D) ∈ f⁻¹(S)] ≤ e^ε · Pr[M(D′) ∈ f⁻¹(S)] = e^ε · Pr[f(M(D′)) ∈ S]. The ' +
+          'post-processor never touches the data, so it cannot be a channel to it — and this holds for randomised f ' +
+          'and for an adversary with unlimited computing power, which is what makes it a *closure* property rather ' +
+          'than a heuristic.',
+        'The practical trap sits on the other side of it. Post-processing is free, but *choosing which query to ask ' +
+          'next after seeing a released answer* is not post-processing — it is adaptive composition, and it is ' +
+          'charged. An analyst who reads one release and picks their next question from it is spending budget in a ' +
+          'way that a ledger counting only "queries asked" still captures correctly, which is why the ledger charges ' +
+          'per release and never tries to be clever about intent.',
+      ],
+    }),
   );
 }
 
@@ -321,6 +402,28 @@ function renderCurve(queryId: string, kind: MechanismKind, epsIndex: number): vo
       { label: 'how much an attacker can conclude (worst-case belief)', style: 'b', kind: 'line' },
       { label: 'the ε you have selected', style: 'ceiling', kind: 'line' },
     ]),
+    chartData({
+      caption: `Both sides of the trade at every stop on the ε ladder, for "${queryById(queryId).label}".`,
+      headers: ['ε', '±95% interval', 'Belief can reach', 'Noise scale b = Δ/ε'],
+      rows: EPS_LADDER.map((text, i) => {
+        const eps = Number(text);
+        const s = specFor(queryId, i, drawKind);
+        return [
+          text + (i === epsIndex ? '  ← selected' : ''),
+          asMoney ? compactMoney(utility(s).interval) : num(utility(s).interval),
+          pct(worstCasePosterior(0.5, eps)),
+          asMoney ? compactMoney(laplaceScale(s)) : num(laplaceScale(s), 2),
+        ];
+      }),
+      trend:
+        'As ε rises the interval shrinks roughly in proportion to 1/ε while the attacker’s belief bound climbs from ' +
+        '50% toward certainty — the two columns move in opposite directions at every row.',
+      notice:
+        `There is no row where both columns are good, which is the entire subject. Then change the query above and ` +
+        `read the table again: the belief column is identical, because it depends only on ε, and the interval column ` +
+        `moves by five orders of magnitude, because it depends on Δ. That is the difference between what ε promises ` +
+        `and what the mechanism costs.`,
+    }),
     el('p', {
       class: 'note',
       text:
