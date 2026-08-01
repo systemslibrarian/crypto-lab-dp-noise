@@ -239,19 +239,24 @@ function renderDecision(hi: number, chosen: OutOfRangeChoice | null): void {
 
   const spec = DECISIONS.find((d) => d.id === chosen)!;
   const a = analyseDecision(PAYROLL_WITH_LATE_HIRE, hi, chosen);
+  // The refusal is driven by `a.private`, which `analyseDecision` derives from
+  // where its Δ came from via `isPrivateCalibration`. It is deliberately not
+  // keyed to the string 'expand': a banner matched on the option's own name
+  // would print the same words however the analysis underneath it came out,
+  // and a verdict that cannot come out the other way establishes nothing.
+  const refused = !a.private;
   out.append(
-    layered(spec.kind, spec.headline, {
+    layered(refused ? 'bad' : spec.kind, refused ? 'Refused — this is not a private calibration' : spec.headline, {
       observation: spec.observation(a.bias, a.sensitivity),
       meaning: spec.meaning,
       details: spec.details,
-      detailsLabel:
-        chosen === 'expand'
-          ? 'Why this leaks, and what to do instead'
-          : 'Why the details matter — the accounting behind this choice',
+      detailsLabel: refused
+        ? 'Why this leaks, and what to do instead'
+        : 'Why the details matter — the accounting behind this choice',
     }),
   );
 
-  if (chosen === 'expand') {
+  if (refused) {
     out.append(
       el('p', { class: 'note' }, [
         el('strong', { text: 'Not offered as a valid mode. ' }),
@@ -266,10 +271,18 @@ function renderDecision(hi: number, chosen: OutOfRangeChoice | null): void {
     out.append(
       statRow(
         [
-          stat('Δ used', money(a.sensitivity), 'the declared bound, unchanged'),
+          stat(
+            'Δ used',
+            money(a.sensitivity),
+            a.deltaSource === 'declared' ? 'the declared bound, unchanged' : 'read off the observed maximum',
+          ),
           stat('Answer before noise', money(a.preNoiseAnswer), `true total ${money(a.preNoiseAnswer + a.bias)}`),
           stat('Systematic bias', money(a.bias), 'not removable by averaging'),
-          stat('Still ε-differentially private', 'yes', 'Δ never touched the data'),
+          stat(
+            'Still ε-differentially private',
+            a.private ? 'yes' : 'no',
+            a.deltaSource === 'declared' ? 'Δ never touched the data' : 'Δ is a function of the data',
+          ),
         ],
         'The consequences of this decision',
       ),

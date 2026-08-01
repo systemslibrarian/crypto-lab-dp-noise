@@ -88,7 +88,7 @@ Then switch to **Explore everything** for the rest: play twelve rounds of the gu
 | Deployment | Model | ε | Provenance |
 | --- | --- | --- | --- |
 | Apple — keyboard and emoji telemetry | Local | ≈ 16/day | Measured by outside researchers ([Tang et al. 2017](https://arxiv.org/abs/1709.02753)) |
-| Google RAPPOR — Chrome telemetry | Local | ≈ 2.20 | Derived from the paper's f = 0.5 ([Erlingsson et al. 2014](https://arxiv.org/abs/1407.6981)) |
+| Google RAPPOR — Chrome telemetry | Local | ε∞ ≈ 2.04 | Derived from the Chrome parameters in the paper's §5.4, f = 0.75 with h = 2 hash functions ([Erlingsson et al. 2014](https://arxiv.org/abs/1407.6981)) |
 | US Census 2020 — redistricting file | Global | 17.14 at δ = 10⁻¹⁰ | Published; budgeted as ρ = 2.63 in zCDP |
 
 The 2020 Census is the largest deployment of differential privacy ever attempted and the one with the most at stake — the PL 94-171 file draws voting districts.
@@ -98,7 +98,7 @@ The 2020 Census is the largest deployment of differential privacy ever attempted
 ```bash
 npm install
 npm run dev        # http://localhost:5173/crypto-lab-dp-noise/
-npm test           # 223 unit tests
+npm test           # 239 unit tests
 npm run build      # typecheck + production build
 npm run test:a11y  # accessibility gates, both themes (needs a build first)
 ```
@@ -113,10 +113,12 @@ npm run test:a11y  # accessibility gates, both themes (needs a build first)
 
 ## Build & Verify
 
-**223 unit tests** (Vitest), all executed in CI before deploy. What they actually pin down:
+**239 unit tests** (Vitest), all executed in CI before deploy. What they actually pin down:
 
 - **Sampler correctness.** `bernoulliExpNeg` is checked against `e^−γ` at five values of γ — the CKS20 parity is easy to transcribe inverted, which silently yields `Bernoulli(1 − e^−γ)`, a sampler that looks right and is exactly wrong. `uniformBelow` is χ²-tested for modulo bias. The discrete Laplace's sampled PMF, mean and variance are checked against the closed form; the discrete Gaussian's mean and variance against σ.
-- **The ε bound itself**, asserted at **every stop on the ε ladder** and end-to-end on the real database: the largest likelihood ratio between the two neighbouring payrolls equals `e^ε` to six digits — attained, not merely respected — and needs a δ below 1e-12.
+- **The ε bound itself**, asserted at **every stop on the ε ladder** and end-to-end on the real database: the largest likelihood ratio between the two neighbouring payrolls equals `e^ε` to six digits — attained, not merely respected — and needs a δ below 1e-12. Asserted twice: once over a comfortable range, and once over **the range Exhibit 2 actually examines**, which is about fifteen times wider. That second assertion exists because the first one passed while the page disagreed with it — out past roughly 75 lattice steps both PMFs underflow to zero in a double, so a ratio taken as the quotient `a/b` returned `Infinity` and the bound was reported as broken at ε = 7 and ε = 10 for a mechanism that meets it exactly. The ratio is now taken from the closed-form log ratio, which never underflows.
+- **The verdicts are wired to the computations they describe.** Exhibit 2's "the rails hold" banner branches on the measured maximum ratio against `e^ε`, not on which mechanism is selected; Exhibit 4b's refusal branches on `isPrivateCalibration` applied to where that choice's Δ came from, not on the option's name; and Exhibit 1 derives "recovered exactly" from `recovered === truth`. A banner that cannot come out the other way establishes nothing, so none of these is written as a literal.
+- **RAPPOR's ε∞ carries its `h`.** Theorem 1 of Erlingsson et al. is `ε∞ = 2h·ln((1 − f/2)/(f/2))`, where `h` is the number of Bloom-filter hash functions — an easy factor to drop, because it sits outside the logarithm, and dropping it reports a guarantee twice as strong as the paper proves for Chrome's `h = 2`. A test asserts the linear scaling in `h` and pins the Chrome parameters (`f = 0.75`, `h = 2`, §5.4) to ε∞ ≈ 2.043.
 - **Reference values.** Φ to twelve digits at nine points plus a relative-error check at Φ(−8) ≈ 6.22e-16, where an absolute-error test would pass for an implementation that returned zero. Laplace closed forms (95% interval = 2.9957·b, 75th percentile = b·ln2). The 2020 Census zCDP conversions.
 - **Cross-checks between independent routes.** The δ summed pointwise off the *discrete* Gaussian's PMF agrees within 10% with Balle & Wang's closed form for the *continuous* Gaussian at the same σ. The analytic calibration is verified to beat the textbook one everywhere the textbook one is claimed to hold, and the textbook σ is verified to actually satisfy its target δ.
 - **The attacks.** The differencing attack recovers the target's salary to the dollar under exact answers and fails under DP; the averaging attack converges within 4 standard deviations of the predicted `b√2/√n`. k is measured at every generalisation level, and the homogeneity leak is asserted at k = 3 and k = 6.

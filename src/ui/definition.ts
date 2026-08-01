@@ -233,7 +233,12 @@ function renderVerdict(
 ): void {
   const out = byId('def-guarantee');
   clear(out);
-  if (!view.gaussian) {
+  // The branch is on `curve.holds` — the measured comparison of the largest
+  // likelihood ratio against e^ε — and not on which mechanism was selected.
+  // Branching on the mechanism name would print "the rails hold" for the
+  // Laplace mode whatever the numbers underneath said, which is a banner that
+  // cannot fail and therefore establishes nothing.
+  if (curve.holds) {
     out.append(
       layered('ok', 'The rails hold — and they are tight', {
         observation:
@@ -252,6 +257,26 @@ function renderVerdict(
             `dozen on screen — because "the ceiling holds" would otherwise only mean "the ceiling holds where we ` +
             `happened to look". It is still a computation over the outputs examined, not a proof of the theorem; the ` +
             `honest-scoping section says so.`,
+        ],
+      }),
+    );
+  } else if (!view.gaussian) {
+    // A pure-ε mechanism whose ratio ran past e^ε. This cannot happen with a
+    // correct discrete Laplace and correct calibration, so it is reported as a
+    // fault in the page rather than dressed up as a lesson about δ.
+    out.append(
+      layered('bad', 'The rails do not hold — and for the Laplace mechanism that is a bug', {
+        observation:
+          `The largest likelihood ratio over the ${curve.points.length} outputs examined is ` +
+          `${ratio(curve.maxRatio)}, against a ceiling of e^ε = ${ratio(curve.ceiling)}. The excess mass is ` +
+          `${curve.deltaNeeded.toExponential(2)}, and for a pure ε mechanism that number must be zero.`,
+        meaning:
+          'The discrete Laplace mechanism satisfies ε-DP exactly, so a violation here is not a fact about ' +
+          'differential privacy — it is a fault in this page\'s calibration or sampler, and it is shown rather than ' +
+          'suppressed. Do not read any privacy claim off this panel while it says this.',
+        details: [
+          'This banner is reachable only if the measured maximum ratio exceeds e^ε. It is wired to the same ' +
+            '`ratioCurve` computation the chart above is drawn from, so it cannot disagree with the picture.',
         ],
       }),
     );

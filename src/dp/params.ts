@@ -53,10 +53,23 @@ export interface Deployment {
   readonly sourceUrl: string;
 }
 
-/** RAPPOR's longitudinal privacy bound at randomisation probability f. */
-export function rapporEpsilonInfinity(f: number): number {
+/**
+ * RAPPOR's longitudinal privacy bound (Erlingsson, Pihur & Korolova, CCS 2014,
+ * Theorem 1):
+ *
+ *   ε∞ = 2h·ln((1 − f/2)/(f/2))
+ *
+ * `h` is the number of hash functions in the Bloom filter and it is not
+ * optional. Each of the h bits a value sets is randomised independently, so the
+ * permanent randomised response leaks h times over and the bound scales with h.
+ * Dropping the factor — an easy transcription to make, because the h sits
+ * outside the logarithm — halves the reported ε of Chrome's h = 2 deployment
+ * and reports a guarantee twice as strong as the paper proves.
+ */
+export function rapporEpsilonInfinity(f: number, h: number): number {
   if (!(f > 0 && f < 1)) throw new RangeError('f must be in (0,1)');
-  return 2 * Math.log((1 - f / 2) / (f / 2));
+  if (!(Number.isInteger(h) && h >= 1)) throw new RangeError('h must be a positive integer');
+  return 2 * h * Math.log((1 - f / 2) / (f / 2));
 }
 
 /**
@@ -83,9 +96,9 @@ export const DEPLOYMENTS: readonly Deployment[] = [
     org: 'Google (RAPPOR)',
     what: 'Chrome settings and homepage telemetry, randomised in the browser',
     model: 'local',
-    eps: rapporEpsilonInfinity(0.5),
+    eps: rapporEpsilonInfinity(0.75, 2),
     epsNote:
-      'The longitudinal bound ε∞ = 2·ln((1 − f/2)/(f/2)) at the paper\'s f = 0.5, computed here rather than quoted. RAPPOR\'s design point is that this bound holds even when the same client reports forever.',
+      'The longitudinal bound ε∞ = 2h·ln((1 − f/2)/(f/2)) at the parameters the paper reports for the Chrome homepage collection — f = 0.75 with h = 2 hash functions — computed here rather than quoted. The h matters: it is the number of Bloom-filter bits each value sets, every one of them randomised independently, so the permanent randomised response leaks h times over. RAPPOR\'s design point is that this bound holds even when the same client reports forever, which is why it is the number to compare against, not the ε₁ = 0.5343 the paper quotes for a single report.',
     provenance: 'derived',
     source: 'Erlingsson, Pihur & Korolova, "RAPPOR" (CCS 2014)',
     sourceUrl: 'https://arxiv.org/abs/1407.6981',

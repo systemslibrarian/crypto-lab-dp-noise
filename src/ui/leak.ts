@@ -11,7 +11,7 @@
 import { differencingAttack } from '../dp/attack';
 import { EMPLOYEES, HIGH_EARNER_THRESHOLD, sumSalary, TARGET_ID } from '../dp/database';
 import { analyse, classOf, LEVELS } from '../dp/kanon';
-import { laplaceScale, type MechanismSpec } from '../dp/mechanism';
+import { lattice, laplaceScale, type MechanismSpec } from '../dp/mechanism';
 import { epsAt, EPS_LADDER } from '../dp/params';
 import { byId, clear, el, layered, money, scroller, stat, statRow, verdict } from './dom';
 import { randomnessNote, sharedRng } from './random';
@@ -109,31 +109,56 @@ function wireAttack(): void {
     if (!dp) {
       // The attacker succeeded, so this is an ALARM even though it "worked":
       // colour tracks system integrity here, never the return value.
+      // `first.exact` is the comparison `recovered === truth`, made by the
+      // attack itself. The headline is derived from it rather than written
+      // beside it, so "recovered exactly" cannot be printed over a subtraction
+      // that did not come out exact.
       out.append(
-        layered('bad', `Alice's salary recovered exactly: ${money(first.recovered)}`, {
-          observation: `Her real salary is ${money(first.truth)}, and the subtraction returned it with an error of zero.`,
-          meaning:
-            'Two queries the system was built to answer, neither of which mentions an individual, and the difference ' +
-            'is a payslip. Publishing only aggregates is not privacy — which is the failure differential privacy was ' +
-            'defined to close.',
-          details: [
-            'Note what would not have helped. Reviewing which aggregates get published does not fix this: both ' +
-              'queries are ones any reasonable review would approve, and the attack needs no side knowledge about the ' +
-              'other eleven people. The problem is not the choice of aggregate, it is that exact answers to overlapping ' +
-              'questions determine their difference.',
-            'Nor does a rule against "small" groups. The attack works at any database size, because it never asks ' +
-              'about a small group — it asks two questions about large ones and subtracts. Restricting queries to ' +
-              'groups above some size is a rule an attacker satisfies trivially.',
-          ],
-        }),
+        layered(
+          'bad',
+          first.exact
+            ? `Alice's salary recovered exactly: ${money(first.recovered)}`
+            : `Alice's salary recovered to within ${money(Math.abs(first.error))}: ${money(first.recovered)}`,
+          {
+            observation: first.exact
+              ? `Her real salary is ${money(first.truth)}, and the subtraction returned it with an error of zero.`
+              : `Her real salary is ${money(first.truth)}, and the subtraction returned ${money(first.recovered)}.`,
+            meaning:
+              'Two queries the system was built to answer, neither of which mentions an individual, and the ' +
+              'difference is a payslip. Publishing only aggregates is not privacy — which is the failure ' +
+              'differential privacy was defined to close.',
+            details: [
+              'Note what would not have helped. Reviewing which aggregates get published does not fix this: both ' +
+                'queries are ones any reasonable review would approve, and the attack needs no side knowledge about ' +
+                'the other eleven people. The problem is not the choice of aggregate, it is that exact answers to ' +
+                'overlapping questions determine their difference.',
+              'Nor does a rule against "small" groups. The attack works at any database size, because it never asks ' +
+                'about a small group — it asks two questions about large ones and subtracts. Restricting queries to ' +
+                'groups above some size is a rule an attacker satisfies trivially.',
+            ],
+          },
+        ),
       );
     } else {
       const spread = results.map((r) => r.recovered);
       const errors = results.map((r) => Math.abs(r.error));
       const median = [...errors].sort((a, b) => a - b)[Math.floor(errors.length / 2)];
+      // Read off the runs, not asserted. "Five different answers" is a claim
+      // about what just happened; the noise is random, so a run of this attack
+      // is entitled to a coincidence, and the panel reports the one it got
+      // rather than printing the expected sentence either way.
+      const distinct = new Set(spread).size;
+      const grid = lattice(dpSpec()).grid;
+      const close = errors.filter((e) => e <= grid).length;
       out.append(
-        layered('ok', 'Attack failed — five runs, five different answers', {
-          observation: `Her real salary is ${money(first.truth)}, and the five runs miss it by about ${money(median)} each.`,
+        layered('ok', `Attack failed — ${trials} runs, ${distinct} different ${distinct === 1 ? 'answer' : 'answers'}`, {
+          observation:
+            `Her real salary is ${money(first.truth)}, and the ${trials} runs miss it by about ${money(median)} each` +
+            (close > 0
+              ? `. ${close === 1 ? 'One run landed' : `${close} runs landed`} within one ${money(grid)} lattice step ` +
+                `of it, which is luck the attacker cannot use: nothing in the released numbers says which run was ` +
+                `the close one.`
+              : '.'),
           meaning:
             `Each answer now carries Laplace noise at scale b = Δ/ε = ${money(laplaceScale(dpSpec()))}. The attack ` +
             `still runs — nothing stops the attacker subtracting — it just stops meaning anything, because the ` +

@@ -29,6 +29,28 @@ describe('the ε bound, at every stop on the ladder', () => {
     expect(curve.deltaNeeded).toBeLessThan(1e-12);
   });
 
+  /**
+   * The same claim, but over the range Exhibit 2 actually examines rather than
+   * the comfortable one above.
+   *
+   * `laplaceAt` spans ±(30/γ + 5), which at ε = 10 is nine lattice steps — far
+   * inside the point where a double-precision PMF underflows. The page spans
+   * ±(12·half + 40), which at ε = 10 is 136 steps, and out there both PMFs are
+   * exactly 0. A `maxRatio` taken as the quotient a/b then returned Infinity
+   * and `holds` returned false for a mechanism that satisfies ε exactly, so the
+   * assertion above passed while the page it describes disagreed with it.
+   */
+  it.each(EPS_LADDER)('still holds at ε = %s over the range the page examines', (text) => {
+    const eps = Number(text);
+    const half = Math.min(90, Math.max(8, Math.ceil(5 / eps)));
+    const span = half * 12 + 40;
+    const curve = ratioCurve({ kind: 'laplace', param: eps, centre: 6, shift: 1, eps, lo: 6 - span, hi: 6 + span });
+    expect(Number.isFinite(curve.maxRatio)).toBe(true);
+    expect(curve.maxRatio).toBeCloseTo(Math.exp(eps), 6);
+    expect(curve.holds).toBe(true);
+    for (const p of curve.points) expect(Number.isFinite(p.ratio)).toBe(true);
+  });
+
   it('holds for a sensitivity larger than one lattice step', () => {
     for (const shift of [1, 5, 51]) {
       const curve = ratioCurve(laplaceAt(1, shift));

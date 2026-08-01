@@ -90,8 +90,29 @@ export function analyseClamp(db: readonly Employee[], hi: number, eps: number): 
 /** What to do about a record above the declared bound. */
 export type OutOfRangeChoice = 'clip' | 'reject' | 'expand';
 
+/** Where the Δ a choice ends up using actually came from. */
+export type DeltaSource = 'declared' | 'observed-maximum';
+
+/**
+ * Whether a proposed Δ is a legitimate calibration.
+ *
+ * The test is not "is the number big enough" — a Δ read off the observed
+ * maximum is always big enough, and always wrong. It is "was this number a
+ * function of the data", which is why the argument is the provenance and not
+ * the value.
+ */
+export function isPrivateCalibration(source: DeltaSource): boolean {
+  return source === 'declared';
+}
+
 export interface DecisionAnalysis {
   readonly choice: OutOfRangeChoice;
+  /**
+   * Where this choice's Δ came from. This, and not its magnitude, is what
+   * decides whether the mechanism is private, so it is carried explicitly and
+   * the verdict below is derived from it rather than written down beside it.
+   */
+  readonly deltaSource: DeltaSource;
   /**
    * Whether the resulting mechanism is still differentially private at the
    * stated ε. Only `expand` fails, and it fails completely rather than by a
@@ -112,10 +133,24 @@ export function analyseDecision(
   choice: OutOfRangeChoice,
 ): DecisionAnalysis {
   const trueSum = db.reduce((acc, e) => acc + e.salary, 0);
+  // `private` is never written as a literal below: each branch states where its
+  // Δ came from, and `isPrivateCalibration` turns that provenance into the
+  // verdict. A branch that started reading Δ off the data would flip its own
+  // verdict without anyone remembering to edit it.
+  const verdictFor = (deltaSource: DeltaSource): { deltaSource: DeltaSource; private: boolean } => ({
+    deltaSource,
+    private: isPrivateCalibration(deltaSource),
+  });
   switch (choice) {
     case 'clip': {
       const answer = db.reduce((acc, e) => acc + Math.min(declaredHi, Math.max(0, e.salary)), 0);
-      return { choice, private: true, sensitivity: declaredHi, preNoiseAnswer: answer, bias: trueSum - answer };
+      return {
+        choice,
+        ...verdictFor('declared'),
+        sensitivity: declaredHi,
+        preNoiseAnswer: answer,
+        bias: trueSum - answer,
+      };
     }
     case 'reject': {
       // Dropping records above a bound that was declared in advance is a
@@ -124,26 +159,26 @@ export function analyseDecision(
       // number now describes a different population than the one asked about.
       const kept = db.filter((e) => e.salary <= declaredHi);
       const answer = kept.reduce((acc, e) => acc + e.salary, 0);
-      return { choice, private: true, sensitivity: declaredHi, preNoiseAnswer: answer, bias: trueSum - answer };
+      return {
+        choice,
+        ...verdictFor('declared'),
+        sensitivity: declaredHi,
+        preNoiseAnswer: answer,
+        bias: trueSum - answer,
+      };
     }
     case 'expand': {
       // Δ is now max(salary): a function of the data, and therefore a leak.
       const observedMax = db.reduce((acc, e) => Math.max(acc, e.salary), 0);
-      return { choice, private: false, sensitivity: observedMax, preNoiseAnswer: trueSum, bias: 0 };
+      return {
+        choice,
+        ...verdictFor('observed-maximum'),
+        sensitivity: observedMax,
+        preNoiseAnswer: trueSum,
+        bias: 0,
+      };
     }
   }
-}
-
-/**
- * Whether a proposed Δ is a legitimate calibration.
- *
- * The test is not "is the number big enough" — a Δ read off the observed
- * maximum is always big enough, and always wrong. It is "was this number a
- * function of the data", which is why the argument is the provenance and not
- * the value.
- */
-export function isPrivateCalibration(source: 'declared' | 'observed-maximum'): boolean {
-  return source === 'declared';
 }
 
 /**

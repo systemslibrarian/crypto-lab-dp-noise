@@ -98,7 +98,16 @@ export function ratioCurve(spec: CurveSpec): RatioCurve {
     const b = pmf(spec, x, spec.centre - spec.shift);
     // The definition is symmetric in D and D′, so the quantity ε must bound is
     // the larger of the two directions.
-    const ratio = Math.max(a / b, b / a);
+    //
+    // Taken from the closed-form log ratio rather than from the quotient a/b.
+    // Both PMFs underflow to exactly 0 out in the tail — at ε = 10 that happens
+    // about 75 lattice steps out, comfortably inside the range Exhibit 2
+    // examines — and the quotient then evaluates to 0/0 or x/0, so `maxRatio`
+    // came back Infinity and `holds` came back false for a mechanism that meets
+    // its ε with equality. The exponent is a difference of magnitudes and never
+    // underflows, so this route agrees with the quotient wherever the quotient
+    // is defined and is still right where it is not.
+    const ratio = Math.exp(Math.abs(logRatio(spec, x)));
     points.push({ x, withTarget: a, withoutTarget: b, ratio });
     if (ratio > maxRatio) maxRatio = ratio;
     excessA += Math.max(0, a - ceiling * b);
