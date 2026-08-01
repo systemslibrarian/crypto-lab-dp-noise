@@ -1,6 +1,6 @@
 # DP Noise
 
-**Differential privacy · ε-δ · Laplace mechanism** — runs the real Laplace and Gaussian mechanisms over a twelve-person payroll so you can watch two databases that differ by one person become impossible to tell apart, and watch the guarantee evaporate when the budget is spent.
+**Differential privacy · ε-δ · Laplace mechanism** — runs the real Laplace and Gaussian mechanisms over a twelve-person payroll so you can watch what DP actually promises about two databases that differ by one person. Not that they become impossible to tell apart: that an attacker's odds of telling them apart move by at most a factor of `e^ε`. The advantage is *bounded*, never eliminated — the optimal attacker still succeeds with probability `(1 + tanh(ε/2))/2`, and the page shows that number next to the bound. Then watch even that guarantee evaporate when the budget is spent.
 
 **Live demo:** https://systemslibrarian.github.io/crypto-lab-dp-noise/
 **Teaching with it:** [TEACHING.md](TEACHING.md) — prerequisites, 15/30/60-minute routes, discussion prompts, expected misconceptions, and which interactions are stochastic.
