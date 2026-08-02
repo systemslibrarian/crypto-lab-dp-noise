@@ -98,7 +98,7 @@ The 2020 Census is the largest deployment of differential privacy ever attempted
 ```bash
 npm install
 npm run dev        # http://localhost:5173/crypto-lab-dp-noise/
-npm test           # 239 unit tests
+npm test           # current unit suite; prints the live test/file totals
 npm run build      # typecheck + production build
 npm run test:a11y  # accessibility gates, both themes (needs a build first)
 ```
@@ -113,7 +113,7 @@ npm run test:a11y  # accessibility gates, both themes (needs a build first)
 
 ## Build & Verify
 
-**239 unit tests** (Vitest), all executed in CI before deploy. What they actually pin down:
+The **current Vitest suite** is executed in CI before deploy; `npm test` prints its live test and file totals. What it actually pins down:
 
 - **Sampler correctness.** `bernoulliExpNeg` is checked against `e^−γ` at five values of γ — the CKS20 parity is easy to transcribe inverted, which silently yields `Bernoulli(1 − e^−γ)`, a sampler that looks right and is exactly wrong. `uniformBelow` is χ²-tested for modulo bias. The discrete Laplace's sampled PMF, mean and variance are checked against the closed form; the discrete Gaussian's mean and variance against σ.
 - **The ε bound itself**, asserted at **every stop on the ε ladder** and end-to-end on the real database: the largest likelihood ratio between the two neighbouring payrolls equals `e^ε` to six digits — attained, not merely respected — and needs a δ below 1e-12. Asserted twice: once over a comfortable range, and once over **the range Exhibit 2 actually examines**, which is about fifteen times wider. That second assertion exists because the first one passed while the page disagreed with it — out past roughly 75 lattice steps both PMFs underflow to zero in a double, so a ratio taken as the quotient `a/b` returned `Infinity` and the bound was reported as broken at ε = 7 and ε = 10 for a mechanism that meets it exactly. The ratio is now taken from the closed-form log ratio, which never underflows.

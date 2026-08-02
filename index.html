@@ -719,9 +719,12 @@
               <code>crypto.getRandomValues</code>: the discrete Laplace as a difference of two geometrics, and the
               discrete Gaussian by Canonne–Kamath–Steinke rejection, both using only rational Bernoulli draws. ε is an
               exact rational, never a float. Sensitivity is computed from a declared clamp; the e^ε bound, the exact δ,
-              and the optimal distinguishing rate are all computed from the mechanism's own PMF. 180 tests pass,
-              including reference values for Φ to twelve digits, the Balle–Wang analytic Gaussian calibration checked
-              against the textbook one, and the ε bound asserted at every stop on the ε ladder.
+              and the optimal distinguishing rate are all computed from the mechanism's own PMF. The repository's
+              <a href="https://github.com/systemslibrarian/crypto-lab-dp-noise/actions/workflows/deploy.yml">current CI run</a>
+              executes the full Vitest suite before it can build or deploy; that suite includes reference values for Φ
+              to twelve digits, the Balle–Wang analytic Gaussian calibration checked against the textbook one, and the ε
+              bound asserted at every stop on the ε ladder. The linked run is the evidence for the current pass/fail
+              result, rather than a test count copied into this page that goes stale as coverage grows.
             </p>
           </div>
           <div class="card">
