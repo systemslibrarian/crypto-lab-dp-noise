@@ -12,6 +12,7 @@
   --panel-2: #211621;
   --border: #3d2637;
   --border-strong: #573950;
+  --control-border: #8a6280; /* select/text-field boundary: >=3.4:1 on panels and field fill (SC 1.4.11) */
 
   --text: #f8eef4;
   --text-dim: #d6bfcc;
@@ -46,6 +47,7 @@
   --panel-2: #fbf1f6;
   --border: #e0c8d6;
   --border-strong: #bf9bad;
+  --control-border: #936780; /* select/text-field boundary: >=4:1 on panels and field fill (SC 1.4.11) */
 
   --text: #1b1016;
   --text-dim: #472c3a;
@@ -324,7 +326,7 @@ body {
 select,
 input[type='text'] {
   padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border);
   border-radius: 10px;
   background-color: var(--bg-2);
   color: var(--text);
