@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4351;
+const PORT = 4627;
 const BASE = '/crypto-lab-dp-noise/';
 
 export default defineConfig({
