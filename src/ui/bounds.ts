@@ -226,12 +226,24 @@ function renderDecision(hi: number, chosen: OutOfRangeChoice | null): void {
   clear(out);
 
   if (chosen === null) {
+    // Whether she is out of range depends on the bound the reader declared, and
+    // at $500,000 she is not: $480,000 fits. The sentence used to assert "above
+    // your declared bound of $500,000" unconditionally, which is arithmetically
+    // false and contradicts the `Records clipped: 0 of 13` stat rendered
+    // directly above it.
+    const fits = LATE_HIRE.salary <= hi;
     out.append(
       verdict(
         'idle',
-        `Mara Kowalski earns ${money(LATE_HIRE.salary)} — above your declared bound of ${money(hi)}`,
-        'A thirteenth person joins the payroll after the bound was published. Nobody gets to un-declare it now. ' +
-          'Choose what the mechanism does with her record.',
+        fits
+          ? `Mara Kowalski earns ${money(LATE_HIRE.salary)} — inside your declared bound of ${money(hi)}`
+          : `Mara Kowalski earns ${money(LATE_HIRE.salary)} — above your declared bound of ${money(hi)}`,
+        fits
+          ? 'A thirteenth person joins the payroll after the bound was published. At this bound her salary fits, ' +
+            'so nothing has to give — which is its own lesson about how the bound was chosen. Lower it above and ' +
+            'the decision becomes real.'
+          : 'A thirteenth person joins the payroll after the bound was published. Nobody gets to un-declare it now. ' +
+            'Choose what the mechanism does with her record.',
       ),
     );
     return;

@@ -21,6 +21,13 @@
   --accent: #ec4899;
   --accent-ink: #2b0416;
   --accent-soft: #35182a;
+  /* Link ink for a link that lands INSIDE a verdict. --accent was chosen
+     against --panel and --bg; a verdict paints a 12% tint of --ok / --alarm /
+     --warn over --bg-2, which is a lighter surface than either, and --accent
+     measured 4.35:1 on the --alarm tint — under the floor, in dark only. This
+     is the same hue two steps brighter: 5.78:1 on the alarm tint, 5.62:1 on
+     the ok tint, 5.55:1 on the warn tint. */
+  --accent-on-tint: #ff6aad;
 
   --series-b: #7cc4ff;
 
@@ -55,6 +62,11 @@
 
   --accent: #a4114f;
   --accent-ink: #ffffff;
+  /* Light needs no separate value: the verdict tints here are 12% of a hue over
+     a near-white --bg-2, so they stay light, and --accent measures 5.26:1 on
+     the alarm tint and 5.43:1 on the warn one. Kept as its own token so the two
+     themes stay symmetrical and the next tint added is asked the question. */
+  --accent-on-tint: #a4114f;
   --accent-soft: #f7e2ec;
 
   --series-b: #0f4c9e;
@@ -374,7 +386,13 @@ input[type='range'] {
 .btn--ghost {
   background-color: transparent;
   color: var(--text);
-  border-color: var(--border-strong);
+  /* --control-border, not --border-strong. A ghost button has no fill, so its
+     border is the only thing that says it is a control at all, and SC 1.4.11
+     asks 3:1 of exactly that. --border-strong is a SURFACE divider and measures
+     1.75:1 against the --panel-2 cards these sit in (2.24:1 in light);
+     --control-border is the token this palette already defines for a component
+     boundary, at 3.44:1 dark / 4.23:1 light. */
+  border-color: var(--control-border);
 }
 
 .btn--danger {
@@ -485,6 +503,20 @@ input[type='range'] {
 .verdict--idle {
   color: var(--text-dim);
   font-weight: 400;
+}
+
+/* A link inside a verdict is on the tint, not on the panel. This is where the
+   exit challenge's "Go and run this:" pointers live — the one link on the page
+   that a reader is most likely to be following, rendered on the surface with the
+   least headroom.
+
+   `#app` is load-bearing in this selector, not decoration. The base rule is
+   `#app a { color: var(--accent) }` at (1,0,1), and a bare `.verdict a` at
+   (0,1,1) loses to it silently — the declaration is written, the cascade
+   discards it, and the measured ratio does not move at all. That is exactly the
+   blanket-rule failure this repo has seen elsewhere, met from the other side. */
+#app .verdict a {
+  color: var(--accent-on-tint);
 }
 
 /* ---------- tables ---------- */
@@ -958,10 +990,16 @@ summary {
   gap: 0.5rem;
 }
 
+/* Same correction as .btn--ghost, and it lands on more controls than the name
+   suggests: this class draws the four prediction checks, the twelve
+   exit-challenge options and the three bounded-sensitivity decisions — every
+   multiple-choice control on the page. Their content is plain prose, so the
+   border is the only thing distinguishing them from the paragraphs around them.
+   Measured 1.85:1 on --bg / 1.75:1 on --panel-2 with --border-strong. */
 .predict__opt {
   flex: 1 1 14rem;
   padding: 0.55rem 0.8rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--control-border);
   border-radius: 10px;
   background-color: var(--bg-2);
   color: var(--text);
@@ -1081,7 +1119,12 @@ summary {
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.6rem 0.85rem;
-  border: 1px solid var(--border-strong);
+  /* The route chooser decides whether five panels exist at all, so it is the
+     most consequential control on the page — and the UNSELECTED one had only a
+     --border-strong edge at 1.85:1 (the selected one is fine, it takes a 2px
+     --accent border). --control-border measures 3.63:1 dark / 4.68:1 light
+     against the --panel this card sits on. */
+  border: 1px solid var(--control-border);
   border-radius: 10px;
   background-color: var(--bg-2);
   color: var(--text);
