@@ -177,7 +177,7 @@ function routeChooser(route: string): HTMLElement {
   ];
   for (const o of options) {
     const on = route === o.id;
-    const btn = el('button', { class: 'path__route', type: 'button', 'aria-pressed': String(on) }, [
+    const btn = el('button', { id: `route-${o.id}`, class: 'path__route', type: 'button', 'aria-pressed': String(on) }, [
       el('span', { class: 'path__route-label', text: o.label }),
       el('span', { class: 'path__route-note', text: o.note }),
     ]);
