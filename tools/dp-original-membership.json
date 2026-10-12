@@ -1,0 +1,66 @@
+{
+  "appSha": "1a71ad1030045c5ac66c674442823d1bc81ece95",
+  "reviewedFrom": "Original 1a71 app fixture source; dark-only loop expanded, not inferred from report statistics",
+  "tests": [
+    [
+      "a11y.spec.ts",
+      "a11y.spec.ts",
+      "no WCAG A/AA violations in dark theme",
+      "chromium"
+    ],
+    [
+      "a11y.spec.ts",
+      "a11y.spec.ts",
+      "no WCAG A/AA violations in dark theme at 380px",
+      "chromium"
+    ],
+    [
+      "claims.spec.ts",
+      "claims.spec.ts",
+      "the differencing comparison follows the session budget without charging or resampling it",
+      "chromium"
+    ],
+    [
+      "claims.spec.ts",
+      "claims.spec.ts",
+      "the scope card points to current CI evidence instead of a stale test count",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "the four core ideas can be established with a keyboard alone",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "a linked ε sync does not establish another exhibit’s step",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "the navigator names one next action, and it advances",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "a revisit pointer into expert-gated material brings the route with it",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "the guided path completes at phone width without sideways scroll",
+      "chromium"
+    ],
+    [
+      "task.spec.ts",
+      "task.spec.ts",
+      "every core conclusion is readable without the charts",
+      "chromium"
+    ]
+  ]
+}

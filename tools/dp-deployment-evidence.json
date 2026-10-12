@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "repository": "systemslibrarian/crypto-lab-dp-noise",
+  "sourceSha": "1a71ad1030045c5ac66c674442823d1bc81ece95",
+  "lockSha256": "189cc22cdb3df1e15e282ee7fa4665581853b7f204f4a1bc40fb09a486a120cc",
+  "deploymentRunId": 38196845801,
+  "deploymentArtifactId": 11723558783,
+  "deploymentArtifactZipSha256": "61732bffd505424a3a4d7a2c9253da72a3837630f0d9c37f6986aa42b177a523",
+  "files": [
+    {
+      "path": "assets/index-kVNfmb9k.js",
+      "bytes": 112155,
+      "sha256": "c77ee888536e2b3f5eaafc7d354cd08f6c0d6e26438af4caa39b21dca1364f52"
+    },
+    {
+      "path": "assets/index-kqSkwSAC.css",
+      "bytes": 19152,
+      "sha256": "34de46617330c0f99303b5d80711d164d70a7d592f69832218c8e571e1f9f6bc"
+    },
+    {
+      "path": "index.html",
+      "bytes": 41136,
+      "sha256": "ca64dd2a33af635a6b47d07fd0747dff6903afbb1487ebbf4864245be3e154fe"
+    }
+  ]
+}
