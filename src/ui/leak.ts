@@ -9,11 +9,13 @@
  * table rather than asserted.
  */
 import { differencingAttack } from '../dp/attack';
+import { bestComposition } from '../dp/composition';
 import { EMPLOYEES, HIGH_EARNER_THRESHOLD, sumSalary, TARGET_ID } from '../dp/database';
 import { analyse, classOf, LEVELS } from '../dp/kanon';
 import { lattice, laplaceScale, type MechanismSpec } from '../dp/mechanism';
 import { epsAt, EPS_LADDER } from '../dp/params';
-import { byId, clear, el, layered, money, scroller, stat, statRow, verdict } from './dom';
+import { byId, clear, el, layered, money, num, scroller, stat, statRow, verdict } from './dom';
+import { onLedgerChange, sessionLedger } from './ledger';
 import { randomnessNote, sharedRng } from './random';
 import { complete } from './state';
 
@@ -76,6 +78,39 @@ function renderTable(): void {
 function wireAttack(): void {
   const out = byId('leak-out');
   const modeSelect = byId<HTMLSelectElement>('leak-mode');
+  let budgetNote: HTMLElement | null = null;
+  let trialsShown = 0;
+
+  const updateBudgetNote = (): void => {
+    if (!budgetNote) return;
+    const ledger = sessionLedger();
+    const state = ledger.state();
+    const oneRun = [
+      { eps: 1, delta: 0, label: 'Total payroll' },
+      { eps: 1, delta: 0, label: 'Payroll without Alice' },
+    ];
+    const first = ledger.quote(oneRun[0]);
+    const both = bestComposition([...state.spends, ...oneRun], ledger.deltaPrime);
+    const allRuns = bestComposition(
+      [...state.spends, ...Array.from({ length: trialsShown }, () => oneRun).flat()],
+      ledger.deltaPrime,
+    );
+    const decision = first.eps > state.budget + 1e-12
+      ? 'refuse the first query'
+      : both.eps > state.budget + 1e-12
+        ? 'admit the first query and refuse the second'
+        : 'admit both queries of one run';
+    budgetNote.textContent =
+      `Each run asks two questions at ε = 1 each: ε = 2 per run by basic composition, ` +
+      `ε = ${2 * trialsShown} across the five runs shown. This unbudgeted illustration does not charge the session ledger. ` +
+      `Against its current budget ${num(state.budget, 2)}, charged ${num(state.charged.eps, 3)}, ` +
+      `remaining ${num(state.remaining, 3)}, the ledger would ${decision}. ` +
+      (allRuns.eps > state.budget + 1e-12
+        ? 'Repeating all five runs would exceed this budget. '
+        : 'Repeating all five runs would remain within this budget. ') +
+      `Failing to recover Alice's salary does not make the attack costless: noisy answers still spend privacy budget.`;
+  };
+  onLedgerChange(updateBudgetNote);
 
   const run = (): void => {
     const dp = modeSelect.value === 'dp';
@@ -83,6 +118,7 @@ function wireAttack(): void {
     const trials = dp ? 5 : 1;
     const results = Array.from({ length: trials }, () => differencingAttack(rng, spec, EMPLOYEES, TARGET_ID));
 
+    budgetNote = null;
     clear(out);
     const first = results[0];
 
@@ -150,6 +186,9 @@ function wireAttack(): void {
       const distinct = new Set(spread).size;
       const grid = lattice(dpSpec()).grid;
       const close = errors.filter((e) => e <= grid).length;
+      trialsShown = trials;
+      budgetNote = el('p', { id: 'leak-budget-quote' });
+      updateBudgetNote();
       out.append(
         layered('ok', `Attack failed — ${trials} runs, ${distinct} different ${distinct === 1 ? 'answer' : 'answers'}`, {
           observation:
@@ -167,13 +206,8 @@ function wireAttack(): void {
             'The noise is calibrated to the declared salary range, not to what anyone actually earns. A sensitivity ' +
               'read off the observed data would itself be a function of the data and would leak it — the exercise in ' +
               'Exhibit 4 makes that choice explicitly.',
-            // The attack is two queries, so it is two charges. Saying so here
-            // stops the DP-mode panel reading as though privacy became free the
-            // moment it started working.
-            `Note what this cost. The attack asks two questions, so it spends twice: ε = 1 each, ε = 2 in total by ` +
-              `basic composition. Against the strict budget in Exhibit 5 that is more than the whole session, and the ` +
-              `ledger there would refuse the second query outright. Failing to recover Alice's salary is not the same ` +
-              `as the attack being harmless — it stopped working because someone paid for it to.`,
+            // Quote the actual session, without billing or resampling this illustration.
+            budgetNote,
             randomnessNote(),
           ],
         }),
