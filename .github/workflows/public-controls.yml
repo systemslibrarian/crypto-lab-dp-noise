@@ -1,0 +1,59 @@
+name: DP public verification
+on:
+  push:
+    branches: [verification/dp-public-controls-20261012]
+permissions:
+  contents: read
+jobs:
+  public-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 1a71ad1030045c5ac66c674442823d1bc81ece95
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Public files match the verified deployment artifact
+        run: |
+          python3 - <<'PY_VERIFY'
+          import hashlib, json, pathlib, urllib.request
+          expected = {'assets/index-kVNfmb9k.js': 'c77ee888536e2b3f5eaafc7d354cd08f6c0d6e26438af4caa39b21dca1364f52', 'assets/index-kqSkwSAC.css': '34de46617330c0f99303b5d80711d164d70a7d592f69832218c8e571e1f9f6bc', 'index.html': 'ca64dd2a33af635a6b47d07fd0747dff6903afbb1487ebbf4864245be3e154fe'}
+          records = []
+          for path, digest in expected.items():
+              url = 'https://systemslibrarian.github.io/crypto-lab-dp-noise/' + path
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  data = response.read()
+                  actual = hashlib.sha256(data).hexdigest()
+                  assert response.status == 200 and actual == digest, (path, actual)
+                  records.append(dict(path=path, url=url, sha256=actual, status=response.status))
+          out = pathlib.Path('verification-results')
+          out.mkdir(exist_ok=True)
+          (out / 'public-byte-binding.json').write_text(json.dumps(records, indent=2) + '\n')
+          PY_VERIFY
+      - name: Original full ten browser fixtures against the public page
+        run: |
+          cat > "$RUNNER_TEMP/dp-public.config.cjs" <<'CONFIG'
+          const path = require('node:path');
+          const {defineConfig,devices} = require(path.join(process.cwd(),'node_modules/@playwright/test'));
+          module.exports=defineConfig({testDir:path.join(process.cwd(),'e2e'),forbidOnly:true,retries:0,reporter:[['list'],['json',{outputFile:path.join(process.cwd(),'verification-results/public-tests.json')}]],timeout:240000,workers:1,use:{baseURL:'https://systemslibrarian.github.io/crypto-lab-dp-noise/',colorScheme:'dark'},projects:[{name:'chromium',use:{...devices['Desktop Chrome']}}]});
+          CONFIG
+          npx playwright test --config "$RUNNER_TEMP/dp-public.config.cjs" --workers=1
+      - name: Require ten actual passing tests
+        run: |
+          python3 - <<'PY_COUNT'
+          import json, pathlib
+          report = json.loads(pathlib.Path('verification-results/public-tests.json').read_text())
+          stats = report['stats']
+          assert stats['expected'] == 10 and stats['unexpected'] == 0 and stats['skipped'] == 0 and stats['flaky'] == 0, stats
+          print(json.dumps(stats))
+          PY_COUNT
+      - uses: actions/upload-pages-artifact@v5
+        if: always()
+        with:
+          name: dp-public-verification
+          path: verification-results
