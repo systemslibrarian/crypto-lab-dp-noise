@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:mutations": "node scripts/mutations.mjs",
     "test:watch": "vitest",
     "test:a11y": "playwright test"
   },

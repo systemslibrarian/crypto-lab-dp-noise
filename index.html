@@ -611,6 +611,94 @@
         </div>
       </section>
 
+      <section class="section" id="geo" aria-labelledby="geo-h" data-depth="expert">
+        <p class="kicker">Exhibit 7 · Geo-indistinguishability</p>
+        <h2 id="geo-h">A privacy budget measured per kilometre</h2>
+        <p class="lede">
+          Ordinary differential privacy says which databases are neighbours. Geo-indistinguishability replaces that
+          yes-or-no relation with a metric: two nearby locations must produce similar output distributions, and the
+          permitted log-likelihood ratio grows as <strong>ε × distance</strong>. This exhibit uses a local Euclidean
+          plane in kilometres — not latitude/longitude and not an Earth-scale map.
+        </p>
+        <p class="note">
+          Source model: Andrés, Bordenabe, Chatzikokolakis and Palamidessi,
+          <a href="https://arxiv.org/abs/1212.1984">Geo-Indistinguishability: Differential Privacy for Location-Based Systems</a>,
+          CCS 2013, Definition 3.1 and §§3–5.3. The ideal density here is
+          <code>ε²/(2π) · exp(−ε·distance)</code>; ε therefore has units km⁻¹.
+        </p>
+
+        <div class="controls" aria-label="Geo-indistinguishability parameters">
+          <div class="field">
+            <label for="geo-eps">Privacy parameter ε (per km)</label>
+            <input id="geo-eps" type="number" min="0.05" max="2" step="0.05" value="0.5" inputmode="decimal" />
+          </div>
+          <div class="field">
+            <label for="geo-distance">Location / path separation (km)</label>
+            <input id="geo-distance" type="number" min="0.25" max="10" step="0.25" value="1" inputmode="decimal" />
+          </div>
+          <div class="field">
+            <label for="geo-releases">Repeated releases</label>
+            <input id="geo-releases" type="number" min="1" max="12" step="1" value="4" inputmode="numeric" />
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>One output, two possible input locations</h3>
+          <p>
+            The displayed witness is chosen on the line through both inputs, where the triangle inequality becomes
+            equality. The bound and the density ratio are calculated independently from the current inputs.
+          </p>
+          <div id="geo-bound-out" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="card">
+            <h3>Utility from the actual planar sampler</h3>
+            <p>
+              Draw 2,000 outputs, compare measured radial error with the analytic distribution, and ask whether each
+              output still chooses the service at the true location among five services eight kilometres apart.
+            </p>
+            <div class="btn-row">
+              <button class="btn" id="geo-sample" type="button">Draw 2,000 planar releases</button>
+            </div>
+            <div id="geo-sample-out" role="status" aria-live="polite"></div>
+          </div>
+
+          <div class="card">
+            <h3>Repeated points are a transcript</h3>
+            <p>
+              Two parallel candidate paths are public. The attacker sees only the noisy points and compares their
+              likelihoods; the teaching controller retains which path generated them so recovery can be checked.
+            </p>
+            <div class="btn-row">
+              <button class="btn btn--danger" id="geo-path" type="button">Release the path transcript</button>
+            </div>
+            <div id="geo-path-out" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>The finite-map border is part of the mechanism</h3>
+          <p>
+            A separate 7 × 7 grid control normalises exponential weights at each input. It demonstrates why directly
+            cropping and renormalising an ideal density is not the same as post-processing an already-private draw.
+          </p>
+          <div id="geo-grid-out"></div>
+        </div>
+
+        <div class="card">
+          <h3>Exact scope of this executable adaptation</h3>
+          <p>
+            The planar density, metric bound, radial utility and transcript likelihood are real computations. The
+            sampler uses IEEE-754 numbers and 53-bit uniforms: it is a teaching implementation of the ideal density,
+            not the paper's finite-precision digital mechanism. Independent releases compose; the panel does not claim
+            trajectory privacy for correlated traces, resistance to auxiliary map knowledge, or production location
+            protection. A plotted point would not strengthen any of those claims, so the evidence is numeric and
+            independently testable instead of decorative map pixels.
+          </p>
+        </div>
+      </section>
+
       <section class="section" id="recap" aria-labelledby="recap-h">
         <p class="kicker">Recap</p>
         <h2 id="recap-h">Differential privacy in five lines</h2>
@@ -692,11 +780,12 @@
           it, read this one:
         </p>
         <p class="lede lede--strong">
-          The mechanisms here are real and exactly sampled, and the ε bound is <em>computed</em> rather than proved —
-          over the outputs examined, which is evidence and not a theorem. Differential privacy is a statistical
-          guarantee about an <em>individual</em>, not a cryptographic one and not a guarantee about a population. The
-          payroll query is released on a coarse lattice, an approximation the panel discloses wherever it applies. And
-          none of this is production code.
+          The payroll mechanisms here are real and exactly sampled; the geo exhibit instead declares its
+          floating-point ideal-density adaptation. The ε bounds are <em>computed</em> rather than proved over the
+          outputs examined, which is evidence and not a theorem. Differential privacy is a statistical guarantee about
+          an <em>individual</em>, not a cryptographic one and not a guarantee about a population. The payroll query is
+          released on a coarse lattice, an approximation the panel discloses wherever it applies. None of this is
+          production code.
         </p>
         <p class="note">
           The eight cards below are that paragraph in full, one claim at a time — what is genuinely real here, what is
@@ -706,11 +795,13 @@
           <div class="card">
             <h3>Real here</h3>
             <p>
-              Every noisy answer on this page comes from an exact sampler driven by
-              <code>crypto.getRandomValues</code>: the discrete Laplace as a difference of two geometrics, and the
-              discrete Gaussian by Canonne–Kamath–Steinke rejection, both using only rational Bernoulli draws. ε is an
-              exact rational, never a float. Sensitivity is computed from a declared clamp; the e^ε bound, the exact δ,
-              and the optimal distinguishing rate are all computed from the mechanism's own PMF. The repository's
+              Every payroll answer comes from an exact sampler driven by <code>crypto.getRandomValues</code>: the
+              discrete Laplace as a difference of two geometrics, and the discrete Gaussian by
+              Canonne–Kamath–Steinke rejection, both using only rational Bernoulli draws. Payroll ε is an exact
+              rational, never a float. The geo exhibit uses the same cryptographic randomness but explicitly samples
+              an ideal continuous density with IEEE-754 numbers; it does not call that exact. Sensitivity is computed
+              from a declared clamp; the e^ε bound, the exact δ, and the optimal distinguishing rate are all computed
+              from the mechanism's own PMF. The repository's
               <a href="https://github.com/systemslibrarian/crypto-lab-dp-noise/actions/workflows/deploy.yml">current CI run</a>
               executes the full Vitest suite before it can build or deploy; that suite includes reference values for Φ
               to twelve digits, the Balle–Wang analytic Gaussian calibration checked against the textbook one, and the ε
@@ -741,7 +832,9 @@
             <p>
               The textbook continuous Laplace is selectable in Exhibit 4 because it is what nearly every tutorial
               implements. It is not the default: sampling as <code>b·ln(u)</code> over a double leaves artefacts that
-              Mironov (CCS 2012) turns into a recovery attack. The discrete modes exist precisely to avoid it.
+              Mironov (CCS 2012) turns into a recovery attack. The discrete payroll modes exist precisely to avoid it.
+              Exhibit 7 also uses floating point, but only under a visible ideal-planar teaching boundary; it makes no
+              exact-sampling or finite-precision theorem claim.
             </p>
           </div>
           <div class="card">

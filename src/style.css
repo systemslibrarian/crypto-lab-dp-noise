@@ -336,7 +336,8 @@ body {
 }
 
 select,
-input[type='text'] {
+input[type='text'],
+input[type='number'] {
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--control-border);
   border-radius: 10px;
@@ -1119,7 +1120,7 @@ summary {
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.6rem 0.85rem;
-  /* The route chooser decides whether five panels exist at all, so it is the
+  /* The route chooser decides whether six panels exist at all, so it is the
      most consequential control on the page — and the UNSELECTED one had only a
      --border-strong edge at 1.85:1 (the selected one is fine, it takes a 2px
      --accent border). --control-border measures 3.63:1 dark / 4.68:1 light

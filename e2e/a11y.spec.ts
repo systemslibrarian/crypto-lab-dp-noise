@@ -14,7 +14,7 @@ import {
  * The lab is driven along everything it teaches, on BOTH of its routes.
  *
  * The guided route first, because that is what the page ships and it is a
- * genuinely different document — five panels removed with `hidden`, and
+ * genuinely different document — six panels removed with `hidden`, and
  * Exhibit 5's cards physically re-ordered so the averaging attack comes before
  * the ledger. Within it: the skip link focused; the jargon glossary opened
  * through its summary; classroom mode on and off; each prediction check answered
@@ -31,14 +31,14 @@ import {
  *
  * Then the route chooser, and the material the guided route had set aside:
  * k-anonymity at every generalisation, post-processing, the composition
- * crossover, the deployments, and the guessing experiment — including its
- * disabled prerequisite state, two thousand real releases, and ten rounds of the
- * game, which is the threshold past which the page starts commenting on the
- * score. Finally the exit challenge, wrong then right, and every disclosure on
+ * crossover, the deployments, the guessing experiment — including its disabled
+ * prerequisite state, two thousand real releases, and ten rounds of the game —
+ * and geo-indistinguishability through exact, invalid, sampled and repeated-path
+ * states. Finally the exit challenge, wrong then right, and every disclosure on
  * the page opened.
  *
- * Every one of those states is scanned, in both themes, at desktop and phone
- * width.
+ * Every one of those states is scanned in the lab's pinned dark theme, at
+ * desktop and phone width.
  *
  * See `gate.ts` for why nothing is injected into the page, why `[hidden]` is
  * never stripped (the old gate did, and so never once measured the route this
