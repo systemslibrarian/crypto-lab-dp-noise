@@ -20,11 +20,12 @@
  *
  * The route toggle is the progressive disclosure. On the guided route the
  * expert panels — the guessing experiment, the composition chart, the
- * deployments, k-anonymity, post-processing — are removed from the page rather
- * than merely de-emphasised, and the navigator says in plain text what is being
- * withheld and how to get it. The honest-scoping section is never hidden on
- * either route: staging rigor is a teaching decision, and concealing the
- * limitations would be a different and worse thing.
+ * deployments, k-anonymity, post-processing and geo-indistinguishability — are
+ * removed from the page rather than merely de-emphasised, and the navigator
+ * says in plain text what is being withheld and how to get it. The
+ * honest-scoping section is never hidden on either route: staging rigor is a
+ * teaching decision, and concealing the limitations would be a different and
+ * worse thing.
  */
 import { CURRICULUM, type Unit } from './curriculum';
 import { byId, clear, el } from './dom';
@@ -33,7 +34,7 @@ import { complete, coreProgress, getState, subscribe, update } from './state';
 /** What the guided route sets aside, named so nothing looks concealed. */
 const EXPERT_MATERIAL =
   'k-anonymity and the homogeneity attack, the guessing experiment, the composition rules and their crossover, ' +
-  'post-processing, and the deployment accounting for Apple, RAPPOR and the 2020 Census';
+  'post-processing, the deployment accounting for Apple, RAPPOR and the 2020 Census, and geo-indistinguishability';
 
 export function initPath(): void {
   stampNaturalOrder();

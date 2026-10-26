@@ -25,7 +25,7 @@ The one thing worth checking in advance is whether the group already believes "a
 ## Before the session
 
 0. **Know where the lesson lives.** The navigator after the intro is the spine: four ideas, the interaction that establishes each, and the exit question that tests each. Exactly one step is tagged **Start here** — the first not yet done — so if you lose your place mid-session, that tag is the answer. Steps tick over only when the learner runs the interaction themselves; dragging a linked ε in a different exhibit deliberately does not count.
-1. **Open the page and pick a route.** It opens on the **guided route**, which removes the expert panels (k-anonymity, the guessing experiment, the composition-rule chart, post-processing, and the deployments panel). That is the right setting for the 15- and 30-minute routes. Switch to **Explore everything** for the 60-minute route.
+1. **Open the page and pick a route.** It opens on the **guided route**, which removes the expert panels (k-anonymity, the guessing experiment, the composition-rule chart, post-processing, the deployments panel and geo-indistinguishability). That is the right setting for the 15- and 30-minute routes. Switch to **Explore everything** for the 60-minute route.
 2. **Turn on classroom mode** if you are demonstrating rather than letting people drive. It is the checkbox at the foot of the intro section. Every sampled panel then draws from a generator seeded at a fixed value, so the run you rehearse is the run you get. The mechanisms and samplers are unchanged; only the sequence of draws is fixed, and every seeded panel says so on screen. Leave it **off** if learners are working on their own machines — an unrepeatable run is the honest default, and the label would otherwise be a distraction.
 3. **Decide whether you are driving.** The four core interactions take about a minute each to run live. The averaging attack at n = 2,000 takes noticeably longer than at n = 200, and the point lands at either.
 
@@ -62,6 +62,7 @@ Explore route. Add, in roughly this order:
 - **The composition rules** (Exhibit 5, chart card). Basic versus advanced, and the crossover.
 - **Post-processing is free** (Exhibit 4). Two releases, one division, no extra cost.
 - **ε in the wild** (Exhibit 6). Ends the session on provenance: published, measured, derived — three different kinds of claim, and the Census's own ρ converting to three defensible ε.
+- **Geo-indistinguishability** (Exhibit 7). Use this as the advanced metric-DP extension: first read the attained ε-per-kilometre bound, then run sampled utility, inspect the finite-grid border failure, and finish with four versus twelve repeated path releases. Budget another 10–15 minutes or substitute it for the deployments discussion.
 
 ## Discussion prompts
 
@@ -97,8 +98,9 @@ Anything below will differ from run to run unless classroom mode is on. Plan aro
 - **Exhibit 3, the guessing game** — a cryptographic coin picks the world. A short run can beat the theoretical ceiling by luck, and the page says so once someone does.
 - **Exhibit 4, releasing answers** — six independent draws. At small ε these can come back negative; that is not a bug and the page explains it when it happens.
 - **Exhibit 5, the averaging attack** — the error curve wanders around the 1/√n prediction rather than sitting on it. A run that tracked the theory exactly would be the suspicious one.
+- **Exhibit 7, planar utility and path transcript** — the radial error, nearest-service result and candidate-path likelihood all come from current planar draws. The exact metric bound, analytic radial utility and finite-grid audit are deterministic.
 
-Everything else — the ratio chart, the belief bounds, the utility curves, the composition rules, the equivalence-class table, the sensitivity exercise — is computed exactly and will be identical on every machine.
+Everything else — the ratio chart, the belief bounds, the payroll utility curves, the composition rules, the equivalence-class table, the sensitivity exercise and Exhibit 7's exact bound/grid control — is deterministic and will be identical on every machine.
 
 ## Debrief answers for the exit challenge
 
@@ -131,6 +133,7 @@ The page is a static build with no backend and no network calls after load. `npm
 - It will not tell your learners what ε to use, and you should not either. There is no universal answer and the page deliberately refuses to imply one.
 - It will not prove the definition. The ε bound is *computed* over the outputs examined, which is evidence rather than a theorem — the honest-scoping section says so, and so should you.
 - It will not teach local DP, Rényi DP, federated learning, or how to use a production library. Those are out of scope by design; point people at [OpenDP](https://github.com/opendp/opendp) or [Google's libraries](https://github.com/google/differential-privacy) for the real thing.
+- It will not turn a per-point location guarantee into trajectory privacy. Exhibit 7 accounts for repeated releases in one bounded two-candidate model and keeps correlated-path assumptions visible; it does not model a production map, movement prior or the paper's finite-precision construction.
 
 ## If you want to know whether it worked
 

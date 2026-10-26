@@ -46,7 +46,7 @@ export const NARROW = { width: 380, height: 800 };
  *     never once scanned the guided route as a reader receives it, and instead
  *     scanned a document with BOTH routes' content on screen at the same time —
  *     a page no visitor can load. This gate never touches `hidden`; it asserts
- *     the five panels are really gone on the guided route, drives that route in
+ *     the six panels are really gone on the guided route, drives that route in
  *     full, then switches with the route chooser and drives the other one.
  *     Every `<details>` is opened by clicking its own `<summary>`.
  *
@@ -56,7 +56,7 @@ export const NARROW = { width: 380, height: 800 };
  *     here is ~500ms against 1100 text-owning elements — but the effect was that
  *     a change in one exhibit was never checked against the rest of the page it
  *     had just changed. This gate scans the WHOLE page every time, in
- *     {dark, light} × {1280, 380}. It is affordable because the arithmetic
+ *     the pinned dark theme at both 1280 and 380 pixels. It is affordable because the arithmetic
  *     contrast walk memoises styles and rects per pass.
  *
  *  4. `violations` IS NOT THE WHOLE ORACLE. See `scan`. Note especially that all
@@ -182,10 +182,11 @@ export async function assertSingleBanner(page: Page): Promise<void> {
   expect(banners, 'exactly one banner landmark').toBe(1);
 }
 
-/** The five panels the guided route sets aside, and what each one holds. */
+/** The six panels the guided route sets aside, and what each one holds. */
 export const EXPERT_PANELS = [
   { sel: '#guess', holds: 'the guessing experiment' },
   { sel: '#wild', holds: 'the deployment accounting' },
+  { sel: '#geo', holds: 'geo-indistinguishability and repeated location releases' },
   { sel: '#kanon-level', holds: 'k-anonymity and the homogeneity attack' },
   { sel: '#dial-mean', holds: 'post-processing' },
   { sel: '#bud-composition', holds: 'the composition rules and their crossover' },
@@ -213,7 +214,7 @@ export const EXPERT_PANELS = [
  *
  * The defaults are asserted at length because on this page they decide which
  * HALF of the document exists. It ships on the GUIDED route, and the guided
- * route deletes five panels — the guessing experiment, the deployments, the
+ * route deletes six panels — the guessing experiment, the deployments, the
  * k-anonymity attack, post-processing, and the composition crossover — with the
  * `hidden` attribute. The gate this replaces stripped that attribute before
  * every scan, so it never saw this state at all. It also ships `linked`, at
@@ -244,7 +245,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('#path .path__steps > li')).toHaveCount(4);
   await expect(page.locator('#objectives li')).toHaveCount(4);
 
-  // ── The shipped route is GUIDED, and it really does remove five panels ────
+  // ── The shipped route is GUIDED, and it really does remove six panels ─────
   await expect(page.locator('#app')).toHaveAttribute('data-route', 'guided');
   const routes = page.locator('.path__route');
   await expect(routes.nth(0)).toHaveAttribute('aria-pressed', 'true');
@@ -782,7 +783,7 @@ async function openAllDisclosures(page: Page): Promise<number> {
   return opened;
 }
 
-/** Switch route with the chooser, and assert the five expert panels followed. */
+/** Switch route with the chooser, and assert the six expert panels followed. */
 async function chooseRoute(page: Page, route: 'guided' | 'explore'): Promise<void> {
   const label = route === 'guided' ? 'Guided lesson' : 'Explore everything';
   await page.locator('.path__route').filter({ hasText: label }).click();
@@ -800,7 +801,7 @@ async function chooseRoute(page: Page, route: 'guided' | 'explore'): Promise<voi
  *
  *  - BOTH ROUTES ARE DRIVEN, GUIDED FIRST AND WITH CONTENT IN IT. The guided
  *    route is what the page ships, and it is a genuinely different document:
- *    five panels removed with `hidden`, and Exhibit 5's three cards physically
+ *    six panels removed with `hidden`, and Exhibit 5's three cards physically
  *    re-appended so the averaging attack comes BEFORE the ledger. The gate this
  *    replaces stripped `[hidden]` before every scan, so it never measured the
  *    guided route at all — and it scanned a hybrid document, with both routes'
@@ -1040,7 +1041,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await openAllDisclosures(page);
   await scanAt('guided route, every disclosure open');
 
-  // ── Switch to Explore: five panels return, and the order changes back ────
+  // ── Switch to Explore: six panels return, and the order changes back ─────
   await chooseRoute(page, 'explore');
   expect(await orderOf(), 'explore order restores the reference sequence').toEqual([
     'The ledger',
@@ -1077,6 +1078,54 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#dep-table .data-table')).toBeVisible();
   await expect(page.locator('#dep-census .stat')).not.toHaveCount(0);
   await scanAt('the composition crossover and the deployments panel');
+
+  // ── Exhibit 7: metric privacy, sampled utility, borders and transcripts ──
+  await expect(page.locator('#geo-bound-out .verdict--ok')).toContainText(
+    'The metric bound is met — tightly'
+  );
+  await expect(page.locator('#geo-grid-naive')).toContainText('violates bound');
+  await expect(page.locator('#geo-grid-repaired')).toContainText('within bound');
+  await expect(page.locator('#geo-sample-out .verdict--idle')).toContainText(
+    'No planar samples drawn yet'
+  );
+  await expect(page.locator('#geo-path-out .verdict--idle')).toContainText(
+    'No release transcript yet'
+  );
+  await scanAt('geo-indistinguishability exact bound and finite-grid control');
+
+  await page.fill('#geo-eps', '2');
+  await page.fill('#geo-distance', '10');
+  await expect(page.locator('#geo-bound-out .verdict--ok')).toContainText(
+    'The metric bound is met — tightly'
+  );
+  await expect(page.locator('#geo-bound-stat')).toHaveAttribute('data-value', '20');
+  await scanAt('geo-indistinguishability at its largest allowed metric bound');
+
+  await page.fill('#geo-eps', '0');
+  await expect(page.locator('#geo-bound-out .verdict--bad')).toContainText('Configuration refused');
+  await expect(page.locator('#geo-sample')).toBeDisabled();
+  await expect(page.locator('#geo-path')).toBeDisabled();
+  await scanAt('geo-indistinguishability rejects an invalid epsilon');
+
+  await page.fill('#geo-eps', '0.5');
+  await page.fill('#geo-distance', '1');
+  await expect(page.locator('#geo-bound-out .verdict--ok')).toBeVisible();
+  await page.click('#geo-sample');
+  await expect(page.locator('#geo-sample-mean')).toBeVisible();
+  await expect(page.locator('#geo-sample-out .verdict--ok')).toContainText('2,000 planar draws measured');
+  await scanAt('geo-indistinguishability sampled utility');
+
+  await page.click('#geo-path');
+  await expect(page.locator('#geo-path-out tbody tr')).toHaveCount(4);
+  await expect(page.locator('#geo-path-out .verdict--warn')).toContainText('within its composed bound');
+  await scanAt('four-release location transcript');
+
+  await page.fill('#geo-releases', '12');
+  await expect(page.locator('#geo-sample-out .verdict--idle')).toBeVisible();
+  await expect(page.locator('#geo-path-out .verdict--idle')).toBeVisible();
+  await page.click('#geo-path');
+  await expect(page.locator('#geo-path-out tbody tr')).toHaveCount(12);
+  await scanAt('twelve-release transcript and retired prior result');
 
   // ── Exhibit 3: the guessing experiment, and its disabled prerequisite ────
   await expect(page.locator('#guess-chart .verdict--idle')).toContainText('No samples drawn yet');
