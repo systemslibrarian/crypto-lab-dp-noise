@@ -105,6 +105,9 @@ test('geo bound and finite-grid labels follow independently recomputed probabili
   await page.goto('.');
   await page.locator('.path__route', { hasText: 'Explore everything' }).click();
 
+  await expect(page.locator('#geo > .controls')).toHaveRole('group');
+  await expect(page.locator('#geo > .controls')).toHaveAccessibleName('Geo-indistinguishability parameters');
+
   const epsilon = 0.5;
   const separation = 1;
   expect(await asDataNumber(page.locator('#geo-loss-stat'))).toBeCloseTo(epsilon * separation, 14);
