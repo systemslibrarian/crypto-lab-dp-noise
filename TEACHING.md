@@ -80,7 +80,7 @@ Ordered roughly by where they fit.
 4. During the sensitivity exercise: *"Who at your organisation would sign off on the salary bound, and what would they base it on?"* (This is usually the moment the room realises the hard part is organisational.)
 5. After the averaging attack: *"Every one of those answers was correctly differentially private. What failed?"* (Nothing in the mechanism. The accounting around it.)
 6. After the refusal: *"Your dashboard is out of budget at 9am. What do you actually do?"* (There is no good answer, and finding that uncomfortable is the correct reaction. Options are: stop answering, serve cached prior releases, raise the budget and say so publicly, or re-scope the release. Note that "add more noise" is not among them.)
-7. After the intersection attack, if you reached the third card in Exhibit 1: *"Both hospitals followed the policy. Which one is responsible?"* (Neither, individually, which is the problem. The disclosure is a property of the pair, and no reviewer of either release could have seen it. That is the structural argument for constraining the mechanism rather than the table.)
+7. After the intersection attack, if you reached the third card in Exhibit 1: *"Both publishers followed the policy. Which one is responsible?"* (Neither release, assessed alone, exposes the exact band. The disclosure is a property of the pair, which is the structural argument for constraining the release mechanism and its history rather than checking one table in isolation.)
 8. Closing, if you reached Exhibit 6: *"The Census published ε = 17.14. e^17 is about 24 million. Is that privacy?"*
 
 ## Expected misconceptions
@@ -94,7 +94,7 @@ These are the four the page is built to dislodge, with the evidence that dislodg
 | **"If we anonymise hard enough, we're fine."** | It is what most regulation still assumes. | Exhibit 1's k-anonymity card: generalise to k = 6 and watch every class stay unanimous. |
 | **"Each answer is private, so all the answers are private."** | Each answer genuinely *is* private. The claim is locally true and globally false. | Exhibit 5's averaging attack. Two thousand private answers, one true payroll. |
 
-A fifth, for groups that get as far as the third card in Exhibit 1: **"so t-closeness is the fixed version."** It is the strongest of the three criteria on the page and it is still a property of one table. Show the intersection attack: two releases that each satisfy k, ℓ and t, and together they give up the target's band. The repairs are not converging on a guarantee; they are patching the examples that were found.
+A fifth, for groups that get as far as the third card in Exhibit 1: **"so t-closeness is the fixed version."** It is the last repair shown here, not a universally strongest point on one privacy scale, and it is still a property of one table. Show the intersection attack: two releases that each satisfy k, ℓ and t, and together they give up the target's band. The repairs are not converging on a mechanism-level guarantee; they answer particular failures under particular release models.
 
 A sixth, almost guaranteed if anyone is numerate: **"then just make t smaller."** Ask what t = 0 requires. On this table it requires every class to have the whole table's distribution, which the page's own utility column prices at losing the query entirely. Li et al. say of their own measure that the relationship between t and information gain is unclear, and give two pairs of distributions at the same EMD whose disclosure is obviously different.
 

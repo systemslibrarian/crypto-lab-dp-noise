@@ -477,7 +477,7 @@ export interface NeighbourContrast {
   readonly serialisedWithout: string;
   readonly outputsDiffer: boolean;
   readonly probabilityWith: 1;
-  readonly probabilityWithout: 0;
+  readonly probabilityWithout: 0 | 1;
   /** This one event is enough to rule out every finite ε for this neighbour pair. */
   readonly thisEventRulesOutFiniteEpsilon: boolean;
   readonly event: string;
@@ -524,7 +524,7 @@ export function neighbourContrast(
     serialisedWithout: withoutTarget,
     outputsDiffer,
     probabilityWith: 1,
-    probabilityWithout: 0,
+    probabilityWithout: outputsDiffer ? 0 : 1,
     // 1 ≤ e^ε · 0 has no solution for finite ε. If the two serialisations had
     // come out identical this particular event would establish nothing; it
     // would NOT prove that some finite ε works for every event and neighbour.

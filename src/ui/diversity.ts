@@ -426,9 +426,12 @@ function wireIntersection(): void {
         meaning:
           `Let the output event be "${contrast.event}". This release is deterministic, so that ` +
           `event has probability ${contrast.probabilityWith} on one neighbour and ` +
-          `${contrast.probabilityWithout} on the other. ε-differential privacy would require ` +
-          `1 ≤ e^ε · 0, and no finite ε satisfies that. The criteria above constrain one published ` +
-          `table; ε constrains a randomised mechanism across neighbouring inputs.`,
+          `${contrast.probabilityWithout} on the other. ` +
+          (contrast.thisEventRulesOutFiniteEpsilon
+            ? 'ε-differential privacy would require 1 ≤ e^ε · 0, and no finite ε satisfies that. '
+            : 'This event does not separate the two worlds, so it establishes no DP violation by itself. ') +
+          `The criteria above constrain one published table; ε constrains a randomised mechanism ` +
+          `across neighbouring inputs.`,
         details: [
           'The scope of that conclusion is narrow and worth keeping narrow. It is about THIS ' +
             'deterministic release and THIS event. It is not a claim that a k, ℓ or t ' +
