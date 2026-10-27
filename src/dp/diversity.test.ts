@@ -24,6 +24,7 @@ import {
   meetsThreshold,
   neighbourContrast,
   orderedEmd,
+  publishRelease,
   separatesWorlds,
   publishedAgeRange,
   reduceFraction,
@@ -72,8 +73,10 @@ describe('the registry table itself', () => {
   it('places the high-earner boundary exactly on the b3/b4 edge', () => {
     // The ordered domain has to agree with the threshold the rest of the lab
     // uses, or "all below $100,000" would not follow from a set of bands.
-    expect(BANDS[2]!.hi).toBe(100_000);
-    expect(BANDS[3]!.lo).toBe(100_000);
+    expect(BANDS[2]!.hi).toBe(100_001);
+    expect(BANDS[3]!.lo).toBe(100_001);
+    expect(bandOf(100_000).id).toBe('b3');
+    expect(bandOf(100_001).id).toBe('b4');
   });
 });
 
@@ -94,6 +97,7 @@ describe('exact k and distinct ℓ', () => {
     ['pairs', 2, 1],
     ['age-decade', 4, 3],
     ['zip3', 4, 3],
+    ['age-split-30', 4, 3],
     ['age-twenty', 8, 4],
   ])('%s is %s-anonymous and distinct %s-diverse', (id, k, l) => {
     const r = report(id);
@@ -117,14 +121,14 @@ describe('exact k and distinct ℓ', () => {
     expect(cls.age).toBe('20–39');
     expect(cls.size).toBe(2);
     expect(cls.candidateBands.map((b) => b.id)).toEqual(['b1']);
-    expect(cls.allBelowThreshold).toBe(true);
+    expect(cls.noneAboveThreshold).toBe(true);
     // 2-anonymous and disclosing: the homogeneity attack, on actual rows.
     expect(r.k).toBeGreaterThanOrEqual(2);
     expect(r.meetsL).toBe(false);
   });
 
   it('has no unanimous class once the release is distinct 3-diverse', () => {
-    for (const id of ['age-decade', 'zip3', 'age-twenty']) {
+    for (const id of ['age-decade', 'zip3', 'age-split-30', 'age-twenty']) {
       expect(report(id).homogeneousClasses, id).toEqual([]);
     }
   });
@@ -225,6 +229,18 @@ describe('the ordered Earth Mover’s distance', () => {
       /at least two values/,
     );
   });
+
+  it('refuses counts that are negative, fractional or inconsistent with their total', () => {
+    expect(() => orderedEmd({ counts: [2, -1], total: 1 }, { counts: [1, 1], total: 2 })).toThrow(
+      /non-negative/,
+    );
+    expect(() => orderedEmd({ counts: [0.5, 0.5], total: 1 }, { counts: [1, 1], total: 2 })).toThrow(
+      /safe integers/,
+    );
+    expect(() => orderedEmd({ counts: [1, 1], total: 3 }, { counts: [1, 1], total: 2 })).toThrow(
+      /sum to its declared total/,
+    );
+  });
 });
 
 describe('the declared t, applied by cross-multiplication', () => {
@@ -246,10 +262,16 @@ describe('the declared t, applied by cross-multiplication', () => {
     expect(() => meetsThreshold({ numerator: 1n, denominator: 2n }, { n: 1n, d: 0n })).toThrow(
       /positive denominator/,
     );
+    expect(() => meetsThreshold({ numerator: -1n, denominator: 2n }, { n: 1n, d: 2n })).toThrow(
+      /non-negative/,
+    );
+    expect(() => meetsThreshold({ numerator: 1n, denominator: 2n }, { n: -1n, d: 2n })).toThrow(
+      /non-negative/,
+    );
   });
 
-  it('is met at equality by both passing releases, which is why t is 9/64', () => {
-    for (const id of ['zip3', 'age-twenty']) {
+  it('is met at equality by all three passing releases, which is why t is 9/64', () => {
+    for (const id of ['zip3', 'age-split-30', 'age-twenty']) {
       const r = report(id);
       expect(frac(r.maxEmd), id).toEqual({ n: 9n, d: 64n });
       expect(r.meetsT, id).toBe(true);
@@ -266,7 +288,7 @@ describe('distinct ℓ-diversity passes where t-closeness does not', () => {
     const similar = r.classes.find((c) => c.age === '30–39')!;
     expect(similar.distinct).toBe(3);
     expect(similar.candidateBands.map((b) => b.id)).toEqual(['b1', 'b2', 'b3']);
-    expect(similar.allBelowThreshold).toBe(true);
+    expect(similar.noneAboveThreshold).toBe(true);
     // ... and it is exactly this class that t-closeness rejects.
     expect(similar.withinT).toBe(false);
     expect(frac(similar.emd)).toEqual({ n: 17n, d: 64n });
@@ -279,7 +301,7 @@ describe('distinct ℓ-diversity passes where t-closeness does not', () => {
     expect(r.meetsL).toBe(true);
     expect(r.meetsT).toBe(true);
     expect(r.classes.every((c) => c.withinT)).toBe(true);
-    expect(r.classes.every((c) => !c.allBelowThreshold && !c.allAboveThreshold)).toBe(true);
+    expect(r.classes.every((c) => !c.noneAboveThreshold && !c.allAboveThreshold)).toBe(true);
   });
 
   it('does not claim the reverse implication', () => {
@@ -340,6 +362,8 @@ describe('the utility cost, read off the rows', () => {
   it('refuses a malformed published range or a backwards query', () => {
     expect(() => publishedAgeRange('grown-up')).toThrow(/cannot read a published age range/);
     expect(publishedAgeRange('any')).toEqual({ lo: 0, hi: 200 });
+    expect(publishedAgeRange('under 30')).toEqual({ lo: 0, hi: 29 });
+    expect(publishedAgeRange('30 and over')).toEqual({ lo: 30, hi: 200 });
     expect(publishedAgeRange('30–39')).toEqual({ lo: 30, hi: 39 });
     expect(() => answerAgeQuery(report('zip3'), { id: 'bad', label: 'x', lo: 40, hi: 30 })).toThrow(
       /must not run backwards/,
@@ -349,22 +373,26 @@ describe('the utility cost, read off the rows', () => {
 
 describe('the repeated-release intersection attack', () => {
   const zip = () => report('zip3');
-  const age = () => report('age-decade');
+  const age = () => report('age-split-30');
   const knowledge = {
-    description: 'the target’s ZIP prefix and age decade',
-    locate: (r: ReturnType<typeof report>) => classOfRecord(r, REGISTRY_TARGET_ID),
+    description: 'the target’s ZIP prefix and the fact that the target is under thirty',
+    observations: [
+      { levelId: 'zip3', dept: 'any', age: 'any', zip: '981**' },
+      { levelId: 'age-split-30', dept: 'any', age: 'under 30', zip: '98***' },
+    ],
   };
 
-  it('publishes two releases that each satisfy the stated k and ℓ on their own', () => {
+  it('publishes two releases that each satisfy the stated k, ℓ and t on their own', () => {
     for (const r of [zip(), age()]) {
-      expect(r.k).toBeGreaterThanOrEqual(DECLARED_K);
-      expect(r.distinctL).toBeGreaterThanOrEqual(DECLARED_L);
+      expect(r.meetsK).toBe(true);
+      expect(r.meetsL).toBe(true);
+      expect(r.meetsT).toBe(true);
       expect(r.homogeneousClasses).toEqual([]);
     }
   });
 
   it('narrows five bands to one, and the one is right', () => {
-    const result = intersectReleases([zip(), age()], knowledge);
+    const result = intersectReleases([publishRelease(zip()), publishRelease(age())], knowledge);
     expect(result.perRelease.map((p) => p.candidates.map((b) => b.id))).toEqual([
       ['b2', 'b3', 'b4'],
       ['b1', 'b4', 'b5'],
@@ -383,8 +411,17 @@ describe('the repeated-release intersection attack', () => {
       const cls = classOfRecord(r, REGISTRY_TARGET_ID)!;
       expect(cls.candidateBands.length).toBeGreaterThan(1);
       expect(cls.allAboveThreshold).toBe(false);
-      expect(cls.allBelowThreshold).toBe(false);
+      expect(cls.noneAboveThreshold).toBe(false);
     }
+  });
+
+  it('removes identities and raw salaries before the attacker runs', () => {
+    const published = publishRelease(zip());
+    const bytes = JSON.stringify(published);
+    expect(bytes).not.toContain('members');
+    expect(bytes).not.toContain('R-101');
+    expect(bytes).not.toContain('118000');
+    expect(published.classes.every((cls) => cls.candidateBands.length > 0)).toBe(true);
   });
 
   it('reads the published rows, and tracks them when they change', () => {
@@ -395,8 +432,8 @@ describe('the repeated-release intersection attack', () => {
     );
     const result = intersectReleases(
       [
-        describeRelease(releaseById('zip3'), policy, scrubbed),
-        describeRelease(releaseById('age-decade'), policy, scrubbed),
+        publishRelease(describeRelease(releaseById('zip3'), policy, scrubbed)),
+        publishRelease(describeRelease(releaseById('age-split-30'), policy, scrubbed)),
       ],
       knowledge,
     );
@@ -415,8 +452,8 @@ describe('the repeated-release intersection attack', () => {
     );
     const result = intersectReleases(
       [
-        describeRelease(releaseById('zip3'), policy, moved),
-        describeRelease(releaseById('age-decade'), policy, moved),
+        publishRelease(describeRelease(releaseById('zip3'), policy, moved)),
+        publishRelease(describeRelease(releaseById('age-split-30'), policy, moved)),
       ],
       knowledge,
     );
@@ -426,16 +463,38 @@ describe('the repeated-release intersection attack', () => {
   });
 
   it('refuses to run on fewer than two releases', () => {
-    expect(() => intersectReleases([zip()], knowledge)).toThrow(/at least two releases/);
+    expect(() => intersectReleases([publishRelease(zip())], knowledge)).toThrow(/at least two releases/);
   });
 
   it('refuses when the attacker cannot locate the target', () => {
     expect(() =>
-      intersectReleases([zip(), age()], {
+      intersectReleases([publishRelease(zip()), publishRelease(age())], {
         description: 'nothing',
-        locate: () => null,
+        observations: [
+          { levelId: 'zip3', dept: 'any', age: 'any', zip: '999**' },
+          { levelId: 'age-split-30', dept: 'any', age: 'under 30', zip: '98***' },
+        ],
       }),
-    ).toThrow(/could not locate/);
+    ).toThrow(/could not .*locate/);
+  });
+
+  it('refuses missing or ambiguous background observations', () => {
+    expect(() =>
+      intersectReleases([publishRelease(zip()), publishRelease(age())], {
+        description: 'only one observation',
+        observations: [{ levelId: 'zip3', dept: 'any', age: 'any', zip: '981**' }],
+      }),
+    ).toThrow(/exactly one observation/);
+    expect(() =>
+      intersectReleases([publishRelease(zip()), publishRelease(age())], {
+        description: 'two conflicting observations',
+        observations: [
+          { levelId: 'zip3', dept: 'any', age: 'any', zip: '981**' },
+          { levelId: 'zip3', dept: 'any', age: 'any', zip: '982**' },
+          { levelId: 'age-split-30', dept: 'any', age: 'under 30', zip: '98***' },
+        ],
+      }),
+    ).toThrow(/exactly one observation/);
   });
 });
 
@@ -447,7 +506,7 @@ describe('the differential-privacy contrast', () => {
     expect(contrast.serialisedWith).not.toBe('');
     expect(contrast.serialisedWithout).not.toBe('');
     expect(contrast.outputsDiffer).toBe(true);
-    expect(contrast.finiteEpsilonExists).toBe(false);
+    expect(contrast.thisEventRulesOutFiniteEpsilon).toBe(true);
     // The event is the output itself: probability 1 in one world, 0 in the other.
     expect(contrast.probabilityWith).toBe(1);
     expect(contrast.probabilityWithout).toBe(0);
@@ -469,9 +528,9 @@ describe('the differential-privacy contrast', () => {
     expect(without(EMPLOYEES, 1).some((e) => e.id === 1)).toBe(false);
   });
 
-  it('reports a finite epsilon exactly when the event does NOT separate the worlds', () => {
-    // Both branches of the derivation, driven directly. Without this the flag
-    // could be the constant `false` and every assertion above would still pass.
+  it('distinguishes a separating event from an event that establishes nothing', () => {
+    // Both branches of the comparison, driven directly. Equality means only
+    // that this event is inconclusive; it does not prove finite-epsilon DP.
     expect(separatesWorlds('a', 'b')).toBe(true);
     expect(separatesWorlds('a', 'a')).toBe(false);
   });

@@ -34,13 +34,14 @@ import type { Employee } from './database';
  * domains as `ordered_dist(v_i, v_j) = |i − j| / (m − 1)` (ICDE 2007, §5.1).
  * That requires the domain to be totally ordered and the order to be declared
  * rather than inferred from a label, so it is declared here: five salary bands,
- * lowest to highest, with the lab's existing $100,000 high-earner threshold
- * falling exactly on the b3/b4 boundary.
+ * lowest to highest, with the b3/b4 boundary matching the lab's existing
+ * integer-dollar predicate "salary > $100,000". In particular, exactly
+ * $100,000 remains in b3 and b4 begins at $100,001.
  *
  * This is what makes "semantically related" a computation rather than a word.
- * Bands b1–b3 are all below the threshold; a class drawn entirely from them
- * discloses that its members earn less than $100,000 however many distinct
- * values it contains.
+ * Bands b1–b3 contain no salary above the threshold; a class drawn entirely
+ * from them discloses that its members earn no more than $100,000 however many
+ * distinct values it contains.
  */
 export interface Band {
   readonly id: string;
@@ -55,8 +56,8 @@ export interface Band {
 export const BANDS: readonly Band[] = [
   { id: 'b1', label: 'under $60,000', index: 0, lo: 0, hi: 60_000 },
   { id: 'b2', label: '$60,000–$79,999', index: 1, lo: 60_000, hi: 80_000 },
-  { id: 'b3', label: '$80,000–$99,999', index: 2, lo: 80_000, hi: 100_000 },
-  { id: 'b4', label: '$100,000–$129,999', index: 3, lo: 100_000, hi: 130_000 },
+  { id: 'b3', label: '$80,000–$100,000', index: 2, lo: 80_000, hi: 100_001 },
+  { id: 'b4', label: '$100,001–$129,999', index: 3, lo: 100_001, hi: 130_000 },
   { id: 'b5', label: '$130,000 and over', index: 4, lo: 130_000, hi: Infinity },
 ];
 
@@ -112,10 +113,11 @@ export const REGISTRY_TARGET_ID = 101;
 
 const decade = (age: number): string => `${Math.floor(age / 10) * 10}–${Math.floor(age / 10) * 10 + 9}`;
 const twenty = (age: number): string => (age < 40 ? '20–39' : '40–59');
+const splitAtThirty = (age: number): string => (age < 30 ? 'under 30' : '30 and over');
 const zip3 = (zip: string): string => `${zip.slice(0, 3)}**`;
 
 /**
- * The four releases, each a declared generalisation of the same sixteen rows.
+ * The five releases, each a declared generalisation of the same sixteen rows.
  *
  * They are `GeneralizationLevel` values so `analyse()` partitions them — the
  * same function that measures k for the payroll, with no second implementation
@@ -171,6 +173,18 @@ export const RELEASES: readonly Release[] = [
     locatability: 'the person’s ZIP prefix',
   },
   {
+    id: 'age-split-30',
+    label: 'Age split at 30, ZIP suppressed',
+    short: 'age < 30 / 30+',
+    note:
+      'Two classes of four and twelve. Both satisfy the declared t; the under-30 class is the ' +
+      'independently compliant age release used in the intersection exercise.',
+    dept: () => 'any',
+    age: (e) => splitAtThirty(e.age),
+    zip: () => '98***',
+    locatability: 'whether the person is under thirty',
+  },
+  {
     id: 'age-twenty',
     label: 'Age to twenty-year bands, ZIP suppressed',
     short: 'age 20yr',
@@ -194,7 +208,7 @@ export function releaseById(id: string): Release {
  * The declared t.
  *
  * 9/64 is not a round number and is chosen on purpose: it is exactly the
- * largest class distance in the two releases that pass, so the page exercises
+ * largest class distance in all three releases that pass, so the page exercises
  * the boundary the definition actually states. Li et al.'s Definition 2 says a
  * class has t-closeness when the distance is "no more than a threshold t", so
  * equality PASSES, and a release sitting exactly on the line is the only way to

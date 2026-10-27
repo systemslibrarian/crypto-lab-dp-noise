@@ -60,9 +60,9 @@ Explore route. Add, in roughly this order:
 - **ℓ-diversity and t-closeness** (Exhibit 1, third card). The follow-up to the follow-up, and the one that usually lands hardest, because it is a history of repairs that each failed. Budget 10–12 minutes and run it in this order:
   1. Select **ZIP to three digits + age to twenty-year bands**. 2-anonymous, distinct ℓ = 1, one unanimous class. Ask what would fix it; someone will say "make sure there are several different values in each group", which is ℓ-diversity, and they will have derived it.
   2. Select **age to ten-year bands**. Distinct 3-diverse now — and the 30–39 class holds three *different* bands that are all below $100,000. Ask whether that group is protected. This is the similarity attack, and the room usually sees it before you name it.
-  3. Select **ZIP to three digits**, then **age to twenty-year bands**. Both meet k ≥ 4, distinct ℓ ≥ 3 and t = 9/64 — the last one *at equality*, which is worth pointing at: the definition says "no more than t", so sitting on the line passes.
+  3. Select **ZIP to three digits**, **age split at 30**, then **age to twenty-year bands**. All three meet k ≥ 4, distinct ℓ ≥ 3 and t = 9/64, each at its largest class distance. The definition says "no more than t", so sitting on the line passes.
   4. Compare the **utility table** between the ten-year and twenty-year releases. The release that fails t answers "how many are in their thirties?" exactly; the release that passes it answers `[0, 8]`. That is the cost, in one number, from the same rows.
-  5. Press **Publish both releases and intersect them**. Two compliant releases, and the target's band falls out exactly. Finish on the DP contrast underneath it.
+  5. Press **Publish both releases and intersect them**. The attack uses the ZIP release and the age split at 30; both pass k, ℓ and t independently, and the target's band falls out exactly. Finish on the DP contrast underneath it.
 - **The guessing game** (Exhibit 3). Best done as a competition. Let someone play twenty rounds at ε = 5, then twenty at ε = 0.1, and put both scores next to the theoretical ceiling.
 - **The Gaussian and δ** (Exhibit 2, mechanism selector). Switch mechanisms and watch the ratio line sail straight through the rails.
 - **The composition rules** (Exhibit 5, chart card). Basic versus advanced, and the crossover.

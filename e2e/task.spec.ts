@@ -261,7 +261,7 @@ test('the release-criteria card is operable from the keyboard and keeps focus', 
   await expect(page.locator('#div-out')).toHaveAttribute('role', 'status');
 
   // Every table on the card has a caption and row headers, at every release.
-  for (const release of ['pairs', 'age-decade', 'zip3', 'age-twenty']) {
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-split-30', 'age-twenty']) {
     await page.selectOption('#div-release', release);
     const tables = page.locator('#div-table .data-table, #div-out .data-table');
     const count = await tables.count();
@@ -282,7 +282,7 @@ test('the release-criteria card fits the smallest supported width', async ({ pag
   await page.locator('.path__route', { hasText: 'Explore everything' }).click();
   await page.click('#div-attack-run');
   await expect(page.locator('#div-intersection')).toBeVisible();
-  for (const release of ['pairs', 'age-decade', 'zip3', 'age-twenty']) {
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-split-30', 'age-twenty']) {
     await page.selectOption('#div-release', release);
     await expect(page.locator('#div-class-body tr').first()).toBeVisible();
     const overflow = await page.evaluate(() => {

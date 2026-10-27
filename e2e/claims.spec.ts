@@ -208,7 +208,10 @@ test('geo path inference uses the visible transcript and pays for every release'
  * imported, so a change to the lab's own domain cannot quietly change what the
  * test expects.
  */
-const BAND_EDGES = [60_000, 80_000, 100_000, 130_000];
+// Exclusive upper bounds, independently restated from the learner-visible
+// domain. The existing query is salary > $100,000, so exactly $100,000 stays
+// in b3 and b4 begins at $100,001.
+const BAND_EDGES = [60_000, 80_000, 100_001, 130_000];
 
 function bandIndexOf(salary: number): number {
   let i = 0;
@@ -267,6 +270,8 @@ test('the class table is the arithmetic the registry rows imply, not a label', a
 
   const registry = await readRegistry(page);
   expect(registry).toHaveLength(16);
+  expect(bandIndexOf(100_000)).toBe(2);
+  expect(bandIndexOf(100_001)).toBe(3);
   const tableCounts = [0, 0, 0, 0, 0];
   for (const r of registry) tableCounts[r.band] += 1;
   expect(tableCounts).toEqual([4, 3, 3, 4, 2]);
@@ -320,8 +325,8 @@ test('the similarity class is distinct 3-diverse and still over t, computed both
   const counts = [0, 0, 0, 0, 0];
   for (const r of thirties) counts[r.band] += 1;
 
-  // Three distinct bands, all of them below the lab's $100,000 boundary, which
-  // is band index 3. That is the similarity attack, derived from the rows.
+  // Three distinct bands, none above the lab's $100,000 boundary, which is
+  // band index 3. That is the similarity attack, derived from the rows.
   expect(counts.filter((c) => c > 0).length).toBe(3);
   expect(counts.slice(3).every((c) => c === 0)).toBe(true);
 
@@ -384,15 +389,49 @@ test('the intersection is the one the two rendered candidate sets imply', async 
 
   const rows = await page.locator('#div-attack-body tr').all();
   expect(rows).toHaveLength(3);
+  await expect(page.locator('#div-attack-out .verdict').first()).toContainText(
+    'Two compliant releases, one exact band',
+  );
+
+  const registry = await readRegistry(page);
+  await expect(page.locator('#div-table caption')).toContainText('not attacker-visible');
+  const tableCounts = [0, 0, 0, 0, 0];
+  for (const r of registry) tableCounts[r.band] += 1;
+  const partitions = [
+    (record: RegistryRow) => record.zip.slice(0, 3),
+    (record: RegistryRow) => (record.age < 30 ? 'under 30' : '30 and over'),
+  ];
 
   const sets: string[][] = [];
-  for (const row of rows.slice(0, 2)) {
+  for (const [index, row] of rows.slice(0, 2).entries()) {
     const cells = await row.locator('td').allTextContents();
-    sets.push(cells[3]!.replace(/[{}\s]/g, '').split(',').filter(Boolean));
-    // Each release's own k and ℓ are printed beside it, and both must meet the
-    // declared policy — otherwise "two compliant releases" would be false.
-    expect(Number(cells[0])).toBeGreaterThanOrEqual(4);
-    expect(Number(cells[1])).toBeGreaterThanOrEqual(3);
+    sets.push(cells[5]!.replace(/[{}\s]/g, '').split(',').filter(Boolean));
+
+    // Rebuild each release from the raw teaching rows. The policy verdict is
+    // accepted only after k, distinct ℓ and the release-wide maximum EMD have
+    // all been recomputed here; this is the regression that prevents a merely
+    // k/ℓ-compliant release from being called "two compliant releases" again.
+    const grouped = new Map<string, RegistryRow[]>();
+    for (const record of registry) {
+      const key = partitions[index]!(record);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(record);
+    }
+    const classCounts = [...grouped.values()].map((members) => {
+      const counts = [0, 0, 0, 0, 0];
+      for (const member of members) counts[member.band] += 1;
+      return { members, counts, distance: emd(counts, tableCounts) };
+    });
+    const k = Math.min(...classCounts.map((entry) => entry.members.length));
+    const l = Math.min(...classCounts.map((entry) => entry.counts.filter((count) => count > 0).length));
+    const max = classCounts.map((entry) => entry.distance).reduce((largest, distance) =>
+      distance.n * largest.d > largest.n * distance.d ? distance : largest,
+    );
+    expect(Number(cells[0])).toBe(k);
+    expect(Number(cells[1])).toBe(l);
+    expect(cells[2]!.trim()).toBe(`${max.n}/${max.d}`);
+    expect(max.n * 64n <= 9n * max.d).toBe(true);
+    expect(cells[3]).toContain('passes k, ℓ and t');
   }
 
   const expected = sets[0]!.filter((b) => sets[1]!.includes(b));
@@ -408,7 +447,6 @@ test('the intersection is the one the two rendered candidate sets imply', async 
   expect(expected.every((b) => b >= 'b4')).toBe(true);
 
   // And the target's real band, which the attack never saw, is in the set.
-  const registry = await readRegistry(page);
   const targetRow = page.locator('#div-table tr.row--target td');
   const salary = Number((await targetRow.nth(2).textContent())!.replace(/[^0-9]/g, ''));
   expect(registry.some((r) => r.salary === salary)).toBe(true);

@@ -12,8 +12,9 @@
  *   knowledge attack, and Principle 2 is the ℓ-diversity principle: a q*-block
  *   is ℓ-diverse if it "contains at least ℓ well-represented values for the
  *   sensitive attribute". The paper instantiates "well represented" as **entropy
- *   ℓ-diversity** (Definition 2) and **recursive (c, ℓ)-diversity** (Definition
- *   3). It does NOT name "distinct ℓ-diversity" as a definition of its own; it
+ *   ℓ-diversity** (Definition 4.1) and **recursive (c, ℓ)-diversity**
+ *   (Definition 4.2). It does NOT name "distinct ℓ-diversity" as a definition
+ *   of its own; it
  *   notes only that entropy ℓ-diversity implies "at least ℓ distinct values".
  *
  * - Li, Li and Venkatasubramanian, "t-Closeness: Privacy Beyond k-Anonymity and
@@ -107,6 +108,20 @@ export function orderedEmd(classCounts: BandCounts, tableCounts: BandCounts): Em
   if (classCounts.counts.length !== tableCounts.counts.length) {
     throw new Error('class and table distributions span different domains');
   }
+  for (const [label, distribution] of [
+    ['class', classCounts],
+    ['table', tableCounts],
+  ] as const) {
+    if (!Number.isSafeInteger(distribution.total)) {
+      throw new Error(`${label} total must be a safe integer`);
+    }
+    if (distribution.counts.some((count) => !Number.isSafeInteger(count) || count < 0)) {
+      throw new Error(`${label} counts must be non-negative safe integers`);
+    }
+    if (distribution.counts.reduce((sum, count) => sum + count, 0) !== distribution.total) {
+      throw new Error(`${label} counts must sum to its declared total`);
+    }
+  }
   const m = BigInt(classCounts.counts.length);
   if (m < 2n) throw new Error('the ordered ground distance needs at least two values');
 
@@ -147,11 +162,13 @@ export function meetsThreshold(
   threshold: { n: bigint; d: bigint },
 ): boolean {
   if (value.denominator <= 0n || threshold.d <= 0n) throw new Error('a fraction needs a positive denominator');
+  if (value.numerator < 0n || threshold.n < 0n) throw new Error('a distance and threshold must be non-negative');
   return value.numerator * threshold.d <= threshold.n * value.denominator;
 }
 
 export interface ClassReport {
   readonly key: string;
+  readonly dept: string;
   readonly age: string;
   readonly zip: string;
   readonly members: readonly Employee[];
@@ -162,8 +179,8 @@ export interface ClassReport {
   readonly withinT: boolean;
   /** The bands that appear, in declared order — the attacker's candidate set. */
   readonly candidateBands: readonly Band[];
-  /** True when every band present sits below the high-earner boundary. */
-  readonly allBelowThreshold: boolean;
+  /** True when no band present can exceed the high-earner threshold. */
+  readonly noneAboveThreshold: boolean;
   readonly allAboveThreshold: boolean;
 }
 
@@ -206,6 +223,7 @@ export function describeRelease(
     const candidateBands = BANDS.filter((b) => counts.counts[b.index]! > 0);
     return {
       key: c.key,
+      dept: c.dept,
       age: c.age,
       zip: c.zip,
       members: c.members,
@@ -215,7 +233,7 @@ export function describeRelease(
       emd,
       withinT: meetsThreshold(emd, policy.t),
       candidateBands,
-      allBelowThreshold: candidateBands.every((b) => b.index < HIGH_BAND_INDEX),
+      noneAboveThreshold: candidateBands.every((b) => b.index < HIGH_BAND_INDEX),
       allAboveThreshold: candidateBands.every((b) => b.index >= HIGH_BAND_INDEX),
     };
   });
@@ -280,9 +298,11 @@ export interface QueryAnswer {
   readonly ambiguity: number;
 }
 
-/** Parse a published age cell: "any", "30–39" or "20–39". */
+/** Parse a bounded, suppressed or open-ended published age cell. */
 export function publishedAgeRange(cell: string): { lo: number; hi: number } {
   if (cell === 'any') return { lo: 0, hi: 200 };
+  if (cell === 'under 30') return { lo: 0, hi: 29 };
+  if (cell === '30 and over') return { lo: 30, hi: 200 };
   const match = /^(\d+)[–-](\d+)$/.exec(cell);
   if (!match) throw new Error(`cannot read a published age range from "${cell}"`);
   return { lo: Number(match[1]), hi: Number(match[2]) };
@@ -325,16 +345,59 @@ export function answerAgeQuery(report: ReleaseReport, query: AgeQuery): QueryAns
  *   (ii) *locatability* — "given any individual's non-sensitive values ... one
  *       can locate the group in which individual has been put in".
  *
+ * The sensitive value in this bounded adaptation is the declared salary BAND,
+ * not the raw dollar salary. Each release publishes the exact band multiset for
+ * a class; this attacker needs only its support (the candidate-band set). The
+ * result therefore demonstrates exact-band disclosure, not salary recovery.
+ *
  * The attacker here gets only what a reader of the two published releases gets,
- * plus the stated background knowledge. The target's real band is never passed
- * in: `intersectReleases` takes two reports and a set of attacker observations,
- * and the teaching layer compares its answer with the truth afterwards.
+ * plus the stated background knowledge. `publishRelease` removes record ids,
+ * names, ages and salaries before the attack runs. `intersectReleases` then
+ * locates a class from explicit quasi-identifier observations; it never receives
+ * the target's record or real band. The teaching layer compares the answer with
+ * ground truth only afterwards.
  */
+export interface PublishedClass {
+  readonly key: string;
+  readonly dept: string;
+  readonly age: string;
+  readonly zip: string;
+  readonly candidateBands: readonly Band[];
+}
+
+export interface PublishedRelease {
+  readonly levelId: string;
+  readonly classes: readonly PublishedClass[];
+}
+
+/** The attacker-visible projection: no record identity or raw sensitive value. */
+export function publishRelease(report: ReleaseReport): PublishedRelease {
+  return {
+    levelId: report.levelId,
+    classes: report.classes.map(
+      (c): PublishedClass => ({
+        key: c.key,
+        dept: c.dept,
+        age: c.age,
+        zip: c.zip,
+        candidateBands: c.candidateBands,
+      }),
+    ),
+  };
+}
+
+export interface AttackerObservation {
+  readonly levelId: string;
+  readonly dept: string;
+  readonly age: string;
+  readonly zip: string;
+}
+
 export interface AttackerKnowledge {
   /** What the attacker knows, in the attacker's own words. */
   readonly description: string;
   /** The published quasi-identifier cell the target falls in, per release. */
-  readonly locate: (report: ReleaseReport) => ClassReport | null;
+  readonly observations: readonly AttackerObservation[];
 }
 
 export interface IntersectionResult {
@@ -351,13 +414,24 @@ export interface IntersectionResult {
 }
 
 export function intersectReleases(
-  reports: readonly ReleaseReport[],
+  reports: readonly PublishedRelease[],
   knowledge: AttackerKnowledge,
 ): IntersectionResult {
   if (reports.length < 2) throw new Error('an intersection attack needs at least two releases');
   const perRelease: IntersectionResult['perRelease'] = reports.map((report) => {
-    const cls = knowledge.locate(report);
-    if (!cls) throw new Error(`the attacker could not locate a class in release ${report.levelId}`);
+    const observations = knowledge.observations.filter((entry) => entry.levelId === report.levelId);
+    if (observations.length !== 1) {
+      throw new Error(`the attacker needs exactly one observation for release ${report.levelId}`);
+    }
+    const observation = observations[0]!;
+    const matches = report.classes.filter(
+      (cls) =>
+        cls.dept === observation.dept && cls.age === observation.age && cls.zip === observation.zip,
+    );
+    if (matches.length !== 1) {
+      throw new Error(`the attacker could not uniquely locate a class in release ${report.levelId}`);
+    }
+    const cls = matches[0]!;
     return { levelId: report.levelId, classKey: cls.key, candidates: cls.candidateBands };
   });
 
@@ -403,7 +477,8 @@ export interface NeighbourContrast {
   readonly outputsDiffer: boolean;
   readonly probabilityWith: 1;
   readonly probabilityWithout: 0;
-  readonly finiteEpsilonExists: boolean;
+  /** This one event is enough to rule out every finite ε for this neighbour pair. */
+  readonly thisEventRulesOutFiniteEpsilon: boolean;
   readonly event: string;
 }
 
@@ -450,9 +525,9 @@ export function neighbourContrast(
     probabilityWith: 1,
     probabilityWithout: 0,
     // 1 ≤ e^ε · 0 has no solution for finite ε. If the two serialisations had
-    // come out identical the event would not separate the worlds and this
-    // argument would not apply — so the flag is derived from the comparison.
-    finiteEpsilonExists: !outputsDiffer,
+    // come out identical this particular event would establish nothing; it
+    // would NOT prove that some finite ε works for every event and neighbour.
+    thisEventRulesOutFiniteEpsilon: outputsDiffer,
     event: 'the serialised release equals the exact string produced on the database that contains the record',
   };
 }

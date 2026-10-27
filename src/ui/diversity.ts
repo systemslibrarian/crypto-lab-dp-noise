@@ -18,6 +18,7 @@ import {
   describeRelease,
   intersectReleases,
   neighbourContrast,
+  publishRelease,
   reduceFraction,
   type ClassReport,
   type ReleaseReport,
@@ -60,9 +61,9 @@ function renderRegistry(): void {
   const table = el('table', { class: 'data-table' }, [
     el('caption', {
       text:
-        'The registry: sixteen synthetic records, one for each ZIP prefix and age decade. ' +
-        'The band column is the declared ordered sensitive domain, so every distance below can be ' +
-        'checked against these rows by hand.',
+        'Omniscient teaching ground truth — not attacker-visible: sixteen synthetic records, one ' +
+        'for each ZIP prefix and age decade. Raw values and the target marker are printed only so ' +
+        'every distance and the final inference can be checked independently.',
     }),
     el('thead', {}, [
       el('tr', {}, [
@@ -216,16 +217,16 @@ function wireReleases(): void {
             'diversity number: distinct ℓ = 1. ℓ-diversity is the repair — require every class to ' +
             'hold at least ℓ distinct sensitive values.',
           details: [
-            'Distinct ℓ-diversity is the weakest of the three readings of "well-represented" in ' +
-              'Machanavajjhala et al. The other two, entropy ℓ-diversity and recursive (c, ℓ)-' +
-              'diversity, are stronger and are not implemented here. This page never calls this ' +
-              'criterion by either of their names.',
+            'Li, Li and Venkatasubramanian §2 call this distinct ℓ-diversity and list it as the ' +
+              'weakest of three readings of "well-represented". The ICDE 2006 ℓ-diversity paper ' +
+              'directly defines the stronger entropy and recursive (c, ℓ) variants; neither is ' +
+              'implemented here.',
           ],
         }),
       );
     } else if (!report.meetsT) {
       const worst = report.classes.find((c) => !c.withinT)!;
-      const concentrated = report.classes.find((c) => c.allBelowThreshold || c.allAboveThreshold);
+      const concentrated = report.classes.find((c) => c.noneAboveThreshold || c.allAboveThreshold);
       out.append(
         layered('bad', `Distinct ${report.distinctL}-diverse, and still over t`, {
           observation:
@@ -237,7 +238,7 @@ function wireReleases(): void {
                 `${concentrated.distinct} bands are ${concentrated.candidateBands
                   .map((b) => b.id)
                   .join(', ')}, every one of them ${
-                  concentrated.allBelowThreshold ? 'below' : 'at or above'
+                  concentrated.noneAboveThreshold ? 'at or below' : 'above'
                 } ${money(HIGH_EARNER_THRESHOLD)}.`
               : ''),
           meaning:
@@ -300,12 +301,17 @@ function wireIntersection(): void {
 
   const run = (): void => {
     const zip = describeRelease(releaseById('zip3'), policy);
-    const age = describeRelease(releaseById('age-decade'), policy);
+    const age = describeRelease(releaseById('age-split-30'), policy);
     const knowledge = {
-      description: 'the target’s ZIP prefix and age decade',
-      locate: (r: ReleaseReport) => classOfRecord(r, REGISTRY_TARGET_ID),
+      description: 'the target’s ZIP prefix and the fact that the target is under thirty',
+      observations: [
+        { levelId: 'zip3', dept: 'any', age: 'any', zip: '981**' },
+        { levelId: 'age-split-30', dept: 'any', age: 'under 30', zip: '98***' },
+      ],
     };
-    const result = intersectReleases([zip, age], knowledge);
+    const reports = [zip, age];
+    const allCompliant = reports.every((report) => report.meetsK && report.meetsL && report.meetsT);
+    const result = intersectReleases(reports.map(publishRelease), knowledge);
     const contrast = neighbourContrast(releaseById('age-twenty'), policy, REGISTRY, REGISTRY_TARGET_ID);
 
     clear(out);
@@ -321,6 +327,8 @@ function wireIntersection(): void {
             el('th', { scope: 'col', text: 'Release' }),
             el('th', { scope: 'col', class: 'numeric', text: 'k' }),
             el('th', { scope: 'col', class: 'numeric', text: 'distinct ℓ' }),
+            el('th', { scope: 'col', class: 'numeric', text: 'max EMD' }),
+            el('th', { scope: 'col', text: 'Policy verdict' }),
             el('th', { scope: 'col', text: 'Target’s class' }),
             el('th', { scope: 'col', text: 'Candidate bands' }),
           ]),
@@ -331,6 +339,13 @@ function wireIntersection(): void {
               el('th', { scope: 'row', text: releaseById(report.levelId).label }),
               el('td', { class: 'numeric', text: String(report.k) }),
               el('td', { class: 'numeric', text: String(report.distinctL) }),
+              el('td', { class: 'numeric mono', text: fractionText(report.maxEmd) }),
+              el('td', {
+                text:
+                  report.meetsK && report.meetsL && report.meetsT
+                    ? 'passes k, ℓ and t'
+                    : 'fails at least one criterion',
+              }),
               el('td', { class: 'mono', text: result.perRelease[i]!.classKey }),
               el('td', {
                 class: 'mono',
@@ -342,6 +357,8 @@ function wireIntersection(): void {
             el('th', { scope: 'row', text: 'Both, intersected' }),
             el('td', { class: 'numeric', text: '—' }),
             el('td', { class: 'numeric', text: '—' }),
+            el('td', { class: 'numeric', text: '—' }),
+            el('td', { text: '—' }),
             el('td', { text: 'the attacker’s conclusion' }),
             el('td', {
               class: 'mono',
@@ -356,22 +373,28 @@ function wireIntersection(): void {
       scroller('What each release says about the target', attackTable),
       layered(
         'bad',
-        result.disclosesExactBand
+        result.disclosesExactBand && allCompliant
           ? `Two compliant releases, one exact band: ${result.intersection[0]!.id} — ${result.intersection[0]!.label}`
-          : `Two compliant releases narrow five bands to ${result.intersection.length}`,
+          : `${allCompliant ? 'Two compliant releases' : 'The selected releases'} narrow five bands to ${result.intersection.length}`,
         {
           observation:
-            `Each release separately holds k ≥ ${DECLARED_K} and distinct ℓ ≥ ${DECLARED_L}, and ` +
-            `neither discloses the target on its own. Intersecting the two candidate sets leaves ` +
+            (allCompliant
+              ? `Each release separately holds k ≥ ${DECLARED_K}, distinct ℓ ≥ ${DECLARED_L} and ` +
+                `ordered t-closeness at t = ${tLabel}. `
+              : 'At least one release fails the displayed policy, so this is not a two-compliant-release result. ') +
+            `The declared background knowledge is ${knowledge.description}. Neither release discloses the target ` +
+            `on its own. Intersecting the two candidate sets leaves ` +
             `{${result.intersection.map((b) => b.id).join(', ')}}` +
             (result.disclosesHighEarner
-              ? `, every member of which is at or above ${money(HIGH_EARNER_THRESHOLD)} — the same ` +
+              ? `, every member of which is above ${money(HIGH_EARNER_THRESHOLD)} — the same ` +
                 `secret the counting query in Exhibit 2 is built to protect.`
               : '.'),
           meaning:
             'The attack needs two things and nothing else, both named by Ganta, Kasiviswanathan ' +
             'and Smith: the sensitive values are published exactly, and the target’s class can ' +
-            'be located from attributes a stranger can look up. Those are design features of ' +
+            'be located from attributes a stranger can look up. Here the published sensitive ' +
+            'value is the salary band, not the raw salary: the class table exposes the exact band ' +
+            'multiset, and the intersection uses its support. Those are design features of ' +
             'microdata publishing, not mistakes in these releases.',
           details: [
             'This is residual disclosure, not unique identification. The attacker never learns ' +
@@ -380,9 +403,13 @@ function wireIntersection(): void {
             'One constructed counterexample is not a composition theorem. It shows that these ' +
               'releases compose badly here; the cited paper measured the effect across two census ' +
               'datasets, which is a different kind of claim and is not reproduced on this page.',
+            'The unequal age split (four records under 30, twelve records 30 and over) is a declared ' +
+              'teaching construction chosen so both releases meet the policy. It is not claimed to ' +
+              'come from Mondrian, Incognito or an anonymisation optimiser.',
             el('p', {
               text:
-                `What an omniscient reader can also see, and the attacker cannot: the target’s ` +
+                `What only the teaching ground-truth table links to the target, and neither ` +
+                `attacker-visible release identifies: the target’s ` +
                 `real band is ${bandOf(target().salary).id} — ${bandOf(target().salary).label}, ` +
                 `from a salary of ${money(target().salary)}. That comparison is made here, after ` +
                 `the attack has finished, and is never an input to it.`,
@@ -422,7 +449,8 @@ function wireIntersection(): void {
       class: 'note',
       text:
         'Two releases of the same sixteen people, published independently, each meeting the stated ' +
-        'criteria. Run the attack to see what they say together.',
+        'k, ℓ and t criteria. The raw registry above is an explicitly omniscient teaching view, not ' +
+        'attacker input. Run the attack to see what the two published views say together.',
     }),
   );
 }

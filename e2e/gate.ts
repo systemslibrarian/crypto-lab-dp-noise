@@ -1076,7 +1076,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   // verdict banner and a different equivalence-class table; then the
   // intersection attack, which adds two more panels and a third banner.
   await expect(page.locator('#div-table .data-table tbody tr')).toHaveCount(16);
-  for (const release of ['pairs', 'age-decade', 'zip3', 'age-twenty']) {
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-split-30', 'age-twenty']) {
     await page.selectOption('#div-release', release);
     await expect(page.locator('#div-out .verdict')).toBeVisible();
     await expect(page.locator('#div-class-body tr').first()).toBeVisible();

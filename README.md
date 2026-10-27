@@ -70,10 +70,12 @@ Both terms name a family, and this page implements one member of each and says s
 
 | Implemented here | Stated as | NOT implemented |
 | --- | --- | --- |
-| **distinct ℓ-diversity** — every equivalence class contains at least ℓ distinct sensitive values | Li, Li & Venkatasubramanian, ICDE 2007, §2, item 1, attributed there to Machanavajjhala et al. | entropy ℓ-diversity (Machanavajjhala et al. Definition 2) and recursive (c, ℓ)-diversity (Definition 3), both strictly stronger |
+| **distinct ℓ-diversity** — every equivalence class contains at least ℓ distinct sensitive values | Li, Li & Venkatasubramanian, ICDE 2007, §2, item 1, attributed there to Machanavajjhala et al. | entropy ℓ-diversity (Machanavajjhala et al. Definition 4.1) and recursive (c, ℓ)-diversity (Definition 4.2), both strictly stronger |
 | **ordered t-closeness** — every class's distribution is within Earth Mover distance t of the whole released table's, under the ordered ground distance `\|i − j\|/(m − 1)` | Li et al. Definition 2 (the t-closeness principle) with §5.1 (numerical attributes) | the equal and hierarchical ground distances of §5.2, and every other distance the principle admits |
 
 A note on attribution that matters: the **ICDE 2006** ℓ-diversity paper this lab read does **not** define "distinct ℓ-diversity" as a definition of its own. It states the ℓ-diversity *principle* ("at least ℓ well-represented values") and instantiates it as entropy and recursive diversity, observing only that entropy ℓ-diversity implies at least ℓ distinct values. The name "distinct ℓ-diversity" is Li et al.'s, in §2, where it arrives with its own warning: *"Distinct ℓ-diversity does not prevent probabilistic inference attacks."* This page uses that name and that warning.
+
+Primary texts checked: [Machanavajjhala et al., ICDE 2006](https://www.cs.cornell.edu/johannes/papers/2006/2006-icde-publishing.pdf), [Li et al., ICDE 2007](https://www.cs.purdue.edu/homes/ninghui/papers/t_closeness_icde07.pdf), and [Ganta et al., KDD 2008](https://www.shivakasiviswanathan.com/KDD08.pdf).
 
 ### The arithmetic, in exact integers
 
@@ -91,17 +93,18 @@ Nothing is computed in floating point. With `c_i` the cumulative count in the cl
 D = ( Σᵢ |N·c_i − C·g_i| ) / ( (m−1)·C·N )
 ```
 
-— a BigInt numerator over a BigInt denominator. The verdict `D ≤ t` is a **cross-multiplication**, `numerator · t.d ≤ t.n · denominator`, so no rounding can decide a pass. The declared `t = 9/64` is chosen to be exactly the largest class distance in the two releases that pass, which puts the "no more than t" boundary on screen instead of in a sentence.
+— a BigInt numerator over a BigInt denominator. The verdict `D ≤ t` is a **cross-multiplication**, `numerator · t.d ≤ t.n · denominator`, so no rounding can decide a pass. The declared `t = 9/64` is exactly the largest class distance in all three releases that pass, which puts the "no more than t" boundary on screen instead of in a sentence.
 
-### The table, and the four releases
+### The table, and the five releases
 
-Sixteen synthetic records, one per (ZIP prefix, age decade) cell, with an ordered five-band sensitive domain whose b3/b4 edge is the lab's existing $100,000 high-earner threshold. Global distribution `(4, 3, 3, 4, 2)/16`.
+Sixteen synthetic records, one per (ZIP prefix, age decade) cell, with an ordered five-band sensitive domain. Its b3/b4 edge matches the lab's integer-dollar query exactly: b3 includes $100,000 and b4 begins at $100,001, because the query asks for salaries **more than** $100,000. Global distribution `(4, 3, 3, 4, 2)/16`.
 
 | Release | k | distinct ℓ | max class EMD | Meets k ≥ 4, ℓ ≥ 3, t = 9/64 |
 | --- | --- | --- | --- | --- |
 | ZIP to 3 digits + age to 20-year bands | 2 | **1** | 29/64 | no — one class is unanimous (b1 twice): the homogeneity attack |
 | Age to 10-year bands | 4 | 3 | **17/64** | no — the 30–39 class holds {b1, b2, b3}, three distinct bands all below $100,000: the **similarity attack** |
 | ZIP to 3 digits | 4 | 3 | **9/64** | yes, at equality |
+| Age split at 30 | 4 | 3 | **9/64** | yes, at equality — the independently compliant age release used below |
 | Age to 20-year bands | 8 | 4 | **9/64** | yes, at equality — the repaired release |
 
 Every one of those numbers is recomputed from the rendered rows by a browser claim test that implements the EMD itself and never reads a verdict label.
@@ -119,14 +122,18 @@ That is the trade, derived from the rows of each release. Li et al. say the same
 
 The attack is the intersection attack of Ganta, Kasiviswanathan and Smith, KDD 2008 (arXiv:0803.0032), §1.1.1, which needs exactly the two properties they name and which hold here by construction: **exact sensitive value disclosure** ("the sensitive value corresponding to each member of the group is published exactly") and **locatability** ("given any individual's non-sensitive values ... one can locate the group in which individual has been put in").
 
-Two releases of the same sixteen people, published independently, each **4-anonymous and distinct 3-diverse**:
+In this bounded adaptation the declared sensitive value is the **salary band**, not the raw dollar salary. Each published class exposes its exact band multiset (the counts shown above), from which the attacker obtains the candidate-band set. The result below therefore establishes disclosure of one exact published band; it does not claim recovery of the underlying salary.
+
+Two releases of the same sixteen people, published independently, each meeting the full declared policy — **4-anonymous, distinct 3-diverse and 9/64-close**:
 
 - by ZIP prefix → the target's class admits bands `{b2, b3, b4}`;
-- by age decade → the target's class admits bands `{b1, b4, b5}`.
+- by whether age is under 30 → the target's class admits bands `{b1, b4, b5}`.
+
+This is a bounded constructed counterexample. The unequal age partition (four records under 30, twelve records 30 and over) is declared up front and chosen to make both individual releases satisfy the policy; it is not presented as output from Mondrian, Incognito or an optimisation algorithm. What the run establishes is existence: satisfying these three single-table criteria does not make this pair compose safely.
 
 Neither discloses on its own: each candidate set straddles the $100,000 boundary. Intersected, they leave `{b4}` — the exact band, and with it the same secret the counting query in Exhibit 2 exists to protect.
 
-The attacker implementation is given two reports and a locator and is never passed the target's real band; the truth is compared with the result afterwards, in the omniscient teaching layer, and a unit test moves the target between bands to confirm the attack follows the published rows rather than a retained value.
+The raw registry printed on the page is explicitly labelled **omniscient teaching ground truth**, not an attacker-visible release. Before the attack runs, `publishRelease` removes record ids, names, exact ages and salaries. The attacker receives only the two published class views plus explicit background observations — ZIP prefix `981**` and “under 30” — and is never passed the target record or real band. The truth is compared with the result afterwards; tests assert that the public projection contains no target identity or salary and move the target between bands to confirm the attack follows the published values rather than retained truth.
 
 **This is residual disclosure, not unique identification** — the attacker never learns which row is the target — and **one constructed counterexample is not a composition theorem**. The cited paper measured the effect across two census datasets; that is a different claim and is not reproduced here.
 
@@ -158,16 +165,17 @@ The twelve-person payroll could not carry this lesson, and the reason is recorde
 | measured k and distinct ℓ per release | `describeRelease`, `distinctBands` | *%s is %s-anonymous and distinct %s-diverse* |
 | the class and whole-table band counts | `countBands` | *computes the exact counts the README prints*; *uses the WHOLE table as the reference distribution* |
 | the exact EMD and its normalisation | `orderedEmd` | hand calculations on two- and three-point domains; *has a final cumulative term of exactly zero*; *normalises by (m−1)·C·N* |
-| the t verdict, including equality | `meetsThreshold` | *passes below t, passes AT t, and fails above it*; *is met at equality by both passing releases* |
-| distinct ℓ passes where t fails | `ClassReport.allBelowThreshold` | *finds a distinct 3-diverse class whose values are all below the threshold* |
+| the t verdict, including equality | `meetsThreshold` | *passes below t, passes AT t, and fails above it*; *is met at equality by all three passing releases* |
+| distinct ℓ passes where t fails | `ClassReport.noneAboveThreshold` | *finds a distinct 3-diverse class whose values are all below the threshold* |
 | the repaired release meets all three | `describeRelease` | *is repaired by a release that meets k, ℓ and t together* |
 | the utility interval and its width | `answerAgeQuery` | *derives the truth from the actual rows, at every release* |
-| each release meets its stated criteria alone | `describeRelease` | *publishes two releases that each satisfy the stated k and ℓ on their own* |
+| each release meets its stated criteria alone | `describeRelease` | *publishes two releases that each satisfy the stated k, ℓ and t on their own* |
+| the attacker gets no hidden record state | `publishRelease` | *removes identities and raw salaries before the attacker runs* |
 | the intersection, from attacker-visible rows only | `intersectReleases` | *narrows five bands to one, and the one is right*; *reads the published rows, and tracks them when they change*; *follows the target's own band when that band changes* |
-| no finite ε for this deterministic release | `neighbourContrast`, `separatesWorlds` | *computes the two neighbouring releases rather than asserting the conclusion*; *reports a finite ε exactly when the event does NOT separate the worlds* |
+| this event rules out finite ε for the deterministic release | `neighbourContrast`, `separatesWorlds` | *computes the two neighbouring releases rather than asserting the conclusion*; *distinguishes a separating event from an event that establishes nothing* |
 | the payroll results are unchanged | — | *leaves the payroll table and every result computed from it untouched* |
 
-Malformed inputs fail explicitly rather than returning a number: an empty class, an empty table, a mismatched domain, a one-value domain, a zero denominator in either side of the threshold comparison, an unreadable published age range, a backwards query range, an unknown release id, and a neighbouring-world request for a record that is not in the table.
+Malformed inputs fail explicitly rather than returning a number: an empty class, an empty table, a mismatched or one-value domain, negative/fractional/inconsistent counts, a zero denominator or negative value in either side of the threshold comparison, an unreadable published age range, a backwards query range, missing or ambiguous attacker observations, an unknown release id, and a neighbouring-world request for a record that is not in the table.
 
 
 ## When to Use It
@@ -219,7 +227,7 @@ npm run dev        # http://localhost:5173/crypto-lab-dp-noise/
 npm test           # current unit suite; prints the live test/file totals
 npm run build      # typecheck + production build
 npm run test:a11y  # accessibility/reflow gates in the pinned dark theme (needs a build first)
-npm run test:mutations # clean baseline, then 20 focused source mutations (8 geo, 12 release-criteria)
+npm run test:mutations # clean baseline, then 22 focused source mutations (8 geo, 14 release-criteria)
 ```
 
 `npm run test:a11y` runs two suites. `e2e/a11y.spec.ts` is the axe conformance sweep — every exhibit driven through its states on both routes, in the lab's pinned dark theme at desktop and phone width. `e2e/task.spec.ts` is the one that asks whether the lesson can actually be *completed*: the whole core path with a keyboard alone, the same path at 375 × 667 asserting no horizontal overflow with every disclosure open, and every core conclusion read out of the data tables with the SVGs removed from the document. Automated WCAG checks are necessary and they do not establish that a dense mathematical interaction is operable.
@@ -246,8 +254,8 @@ The **current Vitest suite** is executed in CI before deploy; `npm test` prints 
 - **The instructional state.** Completion is idempotent and never notifies twice for the same step, `update` never touches the completion set, and the store opens on the guided route with cryptographic randomness — a default that silently flipped to seeded would make every "this is the real mechanism" claim on the page false.
 - **The curriculum's own integrity.** Every core step has exactly one challenge question and no question is shared; every link is a real in-page anchor; the mid-sentence concept form keeps its proper nouns, so nothing can regenerate it by lowercasing and print "the gaussian"; and the set of revisit targets flagged as expert-gated is asserted exactly, because a flag that drifts sends a guided reader to a section that is not on their page.
 - **Geo-indistinguishability.** Known-answer tests pin the planar density, attained metric bound, radial CDF and quantiles. A seeded 50,000-draw check distinguishes the Gamma(shape 2) radius from independent coordinate noise. Finite-grid probabilities are normalised and independently audited at every output cell; the naive border violation and half-rate control are both pinned. Transcript inference accepts public paths and releases but no ground-truth argument, and its loss is checked against the sum of every per-release metric bound. Browser claims independently reproduce the seeded current-run utility and transcript rather than trusting rendered labels.
-- **ℓ-diversity and t-closeness.** Exact k, distinct ℓ, class and whole-table distributions, and the ordered EMD as a BigInt fraction, with hand calculations on two- and three-point domains, the zero final cumulative term, normalisation invariance under doubling both distributions, and the threshold applied below, **at** and above t. The similarity class is asserted to be distinct 3-diverse *and* over t; the repaired release to meet all three criteria; the utility interval to be derived from the rows and to contain the truth. The intersection attack is asserted to disclose nothing from either release alone, to narrow five bands to one, and to move when the published rows move. The payroll's own k, homogeneity leak and record count are asserted unchanged.
-- **Focused mutation evidence.** `npm run test:mutations` first requires every owning suite to pass unmodified, then makes twenty concrete source edits — eight covering geo density normalisation, likelihood orientation, radial CDF/sampling, finite-grid normalisation/audit and transcript accounting, and twelve covering distinct-value counting, the reference distribution, the EMD normalisation factor, a dropped and a reversed cumulative term, `≤` versus `<` at the threshold, a scenario label standing in for the computed verdict, a dropped release in the intersection, ground truth leaked into the attacker, a deterministic release reported as finitely private, a stale utility truth and a collapsed query interval. Every edit must fail its named owning test; the runner restores and hashes the sources, then reruns the clean baseline before accepting the run.
+- **ℓ-diversity and t-closeness.** Exact k, distinct ℓ, class and whole-table distributions, and the ordered EMD as a BigInt fraction, with hand calculations on two- and three-point domains, the zero final cumulative term, normalisation invariance under doubling both distributions, malformed-distribution refusals, and the threshold applied below, **at** and above t. The similarity class is asserted to be distinct 3-diverse *and* over t; the repaired release to meet all three criteria; the utility interval to be derived from the rows and to contain the truth. The intersection attack is asserted to use two releases that each pass k, ℓ **and t**, to receive a public projection with no identity or raw salary, to disclose nothing from either release alone, to narrow five bands to one, and to move when the published rows move. The payroll's own k, homogeneity leak and record count are asserted unchanged.
+- **Focused mutation evidence.** `npm run test:mutations` first requires every owning suite to pass unmodified, then makes twenty-two concrete source edits — eight covering geo density normalisation, likelihood orientation, radial CDF/sampling, finite-grid normalisation/audit and transcript accounting, and fourteen covering distinct-value counting, the reference distribution, the EMD normalisation factor, a dropped and a reversed cumulative term, `≤` versus `<` at the threshold, a scenario label standing in for the computed verdict, the age-partition boundary, secret-bearing fields in the public projection, a dropped release in the intersection, ground truth leaked into the attacker, an inverted deterministic-release event check, a stale utility truth and a collapsed query interval. Every edit must fail its named owning test; the runner restores and hashes the sources, then reruns the clean baseline before accepting the run.
 
 Statistical assertions run on a seeded generator, so a failure means the sampler is wrong rather than that a coin landed badly. The page itself uses `crypto.getRandomValues` and never `Math.random()`.
 
