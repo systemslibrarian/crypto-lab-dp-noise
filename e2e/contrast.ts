@@ -88,7 +88,7 @@ import type { Page } from '@playwright/test';
  *  - `.path__route[aria-pressed='true'] .path__route-label::after` renders the
  *    literal text ` — selected`. It is the visible counterpart of `aria-pressed`
  *    on the route chooser, which is the single most consequential control on the
- *    page — it decides whether six expert panels exist at all — so this is a
+ *    page — it decides whether seven expert panels exist at all — so this is a
  *    string a sighted reader relies on. It does NOT inherit the label's ink: the
  *    rule sets `color: var(--text-dim)` and `font-weight: 400` against the
  *    `.path__route-label`'s `--text` at 700, so measuring the label does not

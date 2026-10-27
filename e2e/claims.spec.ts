@@ -196,3 +196,238 @@ test('geo path inference uses the visible transcript and pays for every release'
     'that retained truth is not an input to the inference function'
   );
 });
+
+/**
+ * L-R-11 — the release criteria, recomputed in the test from the rendered rows.
+ *
+ * None of these assertions reads a verdict label and believes it. Each one
+ * parses the sixteen registry rows out of the page, re-derives the equivalence
+ * classes, the band counts, the exact Earth Mover distance and the utility
+ * interval with arithmetic written here, and only then compares with what the
+ * page printed. The band boundaries are declared in the test rather than
+ * imported, so a change to the lab's own domain cannot quietly change what the
+ * test expects.
+ */
+const BAND_EDGES = [60_000, 80_000, 100_000, 130_000];
+
+function bandIndexOf(salary: number): number {
+  let i = 0;
+  while (i < BAND_EDGES.length && salary >= BAND_EDGES[i]!) i += 1;
+  return i;
+}
+
+interface RegistryRow {
+  age: number;
+  zip: string;
+  salary: number;
+  band: number;
+}
+
+async function readRegistry(page: import('@playwright/test').Page): Promise<RegistryRow[]> {
+  const rows = await page.locator('#div-table .data-table tbody tr').all();
+  const out: RegistryRow[] = [];
+  for (const row of rows) {
+    const cells = await row.locator('td').allTextContents();
+    const salary = Number(cells[2]!.replace(/[^0-9]/g, ''));
+    out.push({
+      age: Number(cells[0]),
+      zip: cells[1]!.trim(),
+      salary,
+      band: bandIndexOf(salary),
+    });
+  }
+  return out;
+}
+
+/** Absolute value of a bigint, written out so nothing is imported for it. */
+const babs = (x: bigint): bigint => (x < 0n ? -x : x);
+
+/** Exact ordered EMD, implemented here from the published formula. */
+function emd(classCounts: number[], tableCounts: number[]): { n: bigint; d: bigint } {
+  const m = BigInt(classCounts.length);
+  const C = BigInt(classCounts.reduce((a, b) => a + b, 0));
+  const N = BigInt(tableCounts.reduce((a, b) => a + b, 0));
+  let cc = 0n;
+  let ct = 0n;
+  let sum = 0n;
+  for (let i = 0; i < classCounts.length; i += 1) {
+    cc += BigInt(classCounts[i]!);
+    ct += BigInt(tableCounts[i]!);
+    sum += babs(N * cc - C * ct);
+  }
+  const g = (a: bigint, b: bigint): bigint => (b === 0n ? a : g(b, a % b));
+  const den = (m - 1n) * C * N;
+  const k = g(sum, den) || 1n;
+  return { n: sum / k, d: den / k };
+}
+
+test('the class table is the arithmetic the registry rows imply, not a label', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+
+  const registry = await readRegistry(page);
+  expect(registry).toHaveLength(16);
+  const tableCounts = [0, 0, 0, 0, 0];
+  for (const r of registry) tableCounts[r.band] += 1;
+  expect(tableCounts).toEqual([4, 3, 3, 4, 2]);
+
+  // Group the rows exactly as the selected release says it groups them: by age
+  // decade, with the ZIP suppressed.
+  await page.selectOption('#div-release', 'age-decade');
+  const groups = new Map<string, RegistryRow[]>();
+  for (const r of registry) {
+    const decade = `${Math.floor(r.age / 10) * 10}–${Math.floor(r.age / 10) * 10 + 9}`;
+    if (!groups.has(decade)) groups.set(decade, []);
+    groups.get(decade)!.push(r);
+  }
+
+  const rendered = await page.locator('#div-class-body tr').all();
+  expect(rendered).toHaveLength(groups.size);
+
+  for (const row of rendered) {
+    const header = (await row.locator('th').textContent())!;
+    const decade = header.split('·')[1]!.trim();
+    const members = groups.get(decade);
+    expect(members, `no rows for decade ${decade}`).toBeDefined();
+
+    const counts = [0, 0, 0, 0, 0];
+    for (const m of members!) counts[m.band] += 1;
+    const distinct = counts.filter((c) => c > 0).length;
+    const expected = emd(counts, tableCounts);
+
+    const cells = await row.locator('td').allTextContents();
+    expect(Number(cells[0]), `size for ${decade}`).toBe(members!.length);
+    expect(cells[1]!.replace(/\s/g, ''), `counts for ${decade}`).toBe(`[${counts.join(',')}]`);
+    expect(Number(cells[2]), `distinct for ${decade}`).toBe(distinct);
+    expect(cells[3]!.trim(), `EMD for ${decade}`).toBe(`${expected.n}/${expected.d}`);
+
+    // And the pass/fail column must be the cross-multiplication against 9/64,
+    // recomputed here rather than read.
+    const withinT = expected.n * 64n <= 9n * expected.d;
+    expect(cells[4]!.includes('within t'), `t verdict for ${decade}`).toBe(withinT);
+  }
+});
+
+test('the similarity class is distinct 3-diverse and still over t, computed both ways', async ({
+  page,
+}) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  await page.selectOption('#div-release', 'age-decade');
+
+  const registry = await readRegistry(page);
+  const thirties = registry.filter((r) => r.age >= 30 && r.age <= 39);
+  const counts = [0, 0, 0, 0, 0];
+  for (const r of thirties) counts[r.band] += 1;
+
+  // Three distinct bands, all of them below the lab's $100,000 boundary, which
+  // is band index 3. That is the similarity attack, derived from the rows.
+  expect(counts.filter((c) => c > 0).length).toBe(3);
+  expect(counts.slice(3).every((c) => c === 0)).toBe(true);
+
+  const tableCounts = [0, 0, 0, 0, 0];
+  for (const r of registry) tableCounts[r.band] += 1;
+  const d = emd(counts, tableCounts);
+  expect(d.n * 64n > 9n * d.d).toBe(true);
+
+  const row = page.locator('#div-class-body tr', { hasText: '30–39' });
+  await expect(row.locator('td').nth(3)).toHaveText(`${d.n}/${d.d}`);
+  await expect(row.locator('td').nth(4)).toContainText('over t');
+  await expect(page.locator('#div-out .verdict')).toContainText('still over t');
+});
+
+test('the repaired release passes t at equality and the page says what it cost', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+
+  const registry = await readRegistry(page);
+  const tableCounts = [0, 0, 0, 0, 0];
+  for (const r of registry) tableCounts[r.band] += 1;
+
+  await page.selectOption('#div-release', 'age-twenty');
+  const halves = new Map<string, RegistryRow[]>();
+  for (const r of registry) {
+    const key = r.age < 40 ? '20–39' : '40–59';
+    if (!halves.has(key)) halves.set(key, []);
+    halves.get(key)!.push(r);
+  }
+  for (const [key, members] of halves) {
+    const counts = [0, 0, 0, 0, 0];
+    for (const m of members) counts[m.band] += 1;
+    const d = emd(counts, tableCounts);
+    // Exactly on the line, which the principle admits: "no more than t".
+    expect(`${d.n}/${d.d}`, key).toBe('9/64');
+  }
+  await expect(page.locator('#div-out .verdict')).toContainText('Meets k');
+
+  // The utility interval, recomputed from the same rows. Every class publishes
+  // the range 20–39 or 40–59, so neither contains "in their thirties" and the
+  // whole young half is merely possible.
+  const truth = registry.filter((r) => r.age >= 30 && r.age <= 39).length;
+  const possible = registry.filter((r) => r.age < 40).length;
+  const utilityRow = page.locator('#div-utility-body tr').first();
+  await expect(utilityRow.locator('td').nth(0)).toHaveText(String(truth));
+  await expect(utilityRow.locator('td').nth(1)).toHaveText(`[0, ${possible}]`);
+  await expect(utilityRow.locator('td').nth(2)).toHaveText(String(possible));
+
+  // The release that FAILS t answers the same question exactly. That contrast
+  // is the utility cost, and both halves of it are read off the page.
+  await page.selectOption('#div-release', 'age-decade');
+  await expect(utilityRow.locator('td').nth(1)).toHaveText(`[${truth}, ${truth}]`);
+  await expect(utilityRow.locator('td').nth(2)).toHaveText('0');
+});
+
+test('the intersection is the one the two rendered candidate sets imply', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  await page.click('#div-attack-run');
+
+  const rows = await page.locator('#div-attack-body tr').all();
+  expect(rows).toHaveLength(3);
+
+  const sets: string[][] = [];
+  for (const row of rows.slice(0, 2)) {
+    const cells = await row.locator('td').allTextContents();
+    sets.push(cells[3]!.replace(/[{}\s]/g, '').split(',').filter(Boolean));
+    // Each release's own k and ℓ are printed beside it, and both must meet the
+    // declared policy — otherwise "two compliant releases" would be false.
+    expect(Number(cells[0])).toBeGreaterThanOrEqual(4);
+    expect(Number(cells[1])).toBeGreaterThanOrEqual(3);
+  }
+
+  const expected = sets[0]!.filter((b) => sets[1]!.includes(b));
+  await expect(page.locator('#div-intersection')).toHaveText(`{${expected.join(', ')}}`);
+
+  // Neither release discloses on its own: each candidate set straddles the
+  // $100,000 boundary, which is the b3/b4 edge.
+  for (const set of sets) {
+    expect(set.some((b) => b <= 'b3')).toBe(true);
+    expect(set.some((b) => b >= 'b4')).toBe(true);
+  }
+  // Together they do not.
+  expect(expected.every((b) => b >= 'b4')).toBe(true);
+
+  // And the target's real band, which the attack never saw, is in the set.
+  const registry = await readRegistry(page);
+  const targetRow = page.locator('#div-table tr.row--target td');
+  const salary = Number((await targetRow.nth(2).textContent())!.replace(/[^0-9]/g, ''));
+  expect(registry.some((r) => r.salary === salary)).toBe(true);
+  expect(expected).toContain(`b${bandIndexOf(salary) + 1}`);
+});
+
+test('the deterministic-release counterexample is computed, and keeps its scope', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  await page.click('#div-attack-run');
+
+  const dp = page.locator('#div-attack-out .verdict').nth(1);
+  await expect(dp).toContainText('differ');
+  await expect(dp).toContainText('1 ≤ e^ε · 0');
+  await expect(dp).toContainText('no finite ε satisfies that');
+
+  // The scope caveats are part of the claim, not decoration.
+  await dp.locator('.layered__more > summary').click();
+  await expect(dp).toContainText('about THIS');
+  await expect(dp).toContainText('could never appear inside some differentially private mechanism');
+  await expect(dp).toContainText('does not stop a release teaching true things about a population');
+});

@@ -310,6 +310,36 @@
           <div id="kanon-out" role="status" aria-live="polite"></div>
         </div>
 
+        <div class="card" data-depth="expert">
+          <h3>The repairs: &#8467;-diversity, then t-closeness</h3>
+          <p>
+            &#8467;-diversity answers the homogeneity attack by requiring several sensitive values in every
+            class; t-closeness answers &#8467;-diversity by requiring each class&rsquo;s distribution to resemble the
+            whole table&rsquo;s. Both are criteria on a <em>published table</em>. This card runs them on a second
+            synthetic registry &mdash; sixteen records, printed in full &mdash; and then breaks both of them with two
+            releases that each satisfy the stated policy.
+          </p>
+          <p class="note">
+            The criteria implemented here are <strong>distinct &#8467;-diversity</strong> (every class holds at least
+            &#8467; distinct values) and <strong>ordered t-closeness</strong> (every class&rsquo;s band distribution is
+            within Earth Mover distance t of the whole table&rsquo;s, under a declared total order on the bands).
+            Entropy and recursive (c,&nbsp;&#8467;)-diversity are stronger and are not implemented. The declared
+            policy is k&nbsp;&ge;&nbsp;4, distinct &#8467;&nbsp;&ge;&nbsp;3 and t&nbsp;=&nbsp;9/64.
+          </p>
+          <div id="div-table"></div>
+          <div class="controls">
+            <div class="field field--grow">
+              <label for="div-release">Release published from the registry</label>
+              <select id="div-release"></select>
+            </div>
+          </div>
+          <div id="div-out" role="status" aria-live="polite"></div>
+          <div class="controls">
+            <button class="btn" id="div-attack-run" type="button">Publish both releases and intersect them</button>
+          </div>
+          <div id="div-attack-out" role="status" aria-live="polite"></div>
+        </div>
+
         <p class="note">
           Both failures have the same shape: they are properties of the <em>data released</em>, and an attacker attacks
           with everything else they know. Differential privacy makes the promise about the <em>mechanism</em> instead —

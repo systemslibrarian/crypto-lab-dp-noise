@@ -125,8 +125,13 @@ test('the navigator names one next action, and it advances', async ({ page }) =>
 
 test('a revisit pointer into expert-gated material brings the route with it', async ({ page }) => {
   await page.goto('.');
-  // The k-anonymity panel is set aside on the guided route.
-  await expect(page.locator('#leak [data-depth="expert"]')).toBeHidden();
+  // Exhibit 1's expert cards — k-anonymity, and the ℓ-diversity/t-closeness
+  // card beside it — are both set aside on the guided route. Asserting the
+  // count first keeps this honest: a selector that silently stopped matching
+  // would otherwise make `toBeHidden` trivially true.
+  const expertCards = page.locator('#leak [data-depth="expert"]');
+  await expect(expertCards).toHaveCount(2);
+  for (let i = 0; i < 2; i += 1) await expect(expertCards.nth(i)).toBeHidden();
 
   // Answer the anonymisation scenario wrongly to summon its pointer.
   await page.click('#x-anonymisation-0');
@@ -136,7 +141,8 @@ test('a revisit pointer into expert-gated material brings the route with it', as
   await expect(page.locator('#x-anonymisation-q').locator('..')).toContainText('switches you to the Explore route');
 
   await pointer.click();
-  await expect(page.locator('#leak [data-depth="expert"]')).toBeVisible();
+  await expect(expertCards).toHaveCount(2);
+  for (let i = 0; i < 2; i += 1) await expect(expertCards.nth(i)).toBeVisible();
 });
 
 test('the guided path completes at phone width without sideways scroll', async ({ page }) => {
@@ -210,4 +216,96 @@ test('every core conclusion is readable without the charts', async ({ page }) =>
   const avgData = page.locator('#avg-chart .data-details');
   await expect(avgData).toContainText('Predicted error');
   await expect(avgData).toContainText('Sampled versus theoretical');
+});
+
+test('the release-criteria card is operable from the keyboard and keeps focus', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+
+  // A native <select> opens an OS popup on arrow keys, and whether that moves
+  // the value is a platform decision rather than this page's — so the test
+  // asserts the three things that ARE this page's: the control is in the tab
+  // order, a change really re-renders the panel, and focus survives the
+  // re-render. Focus stability is the real hazard here, because the handler
+  // rebuilds every node under the control.
+  const select = page.locator('#div-release');
+  const reached = await page.evaluate(() => {
+    const el = document.getElementById('div-release');
+    return el !== null && !el.hasAttribute('disabled') && el.tabIndex >= 0;
+  });
+  expect(reached).toBe(true);
+
+  await select.focus();
+  await expect(select).toBeFocused();
+  await expect(select).toHaveValue('age-decade');
+
+  await select.selectOption('pairs');
+  await expect(page.locator('#div-out .verdict')).toContainText('unanimous');
+  await expect(select).toBeFocused();
+
+  await select.selectOption('zip3');
+  await expect(page.locator('#div-out .verdict')).toContainText('Meets k');
+  await expect(select).toBeFocused();
+
+  // And the attack runs from Enter on its button.
+  const run = page.locator('#div-attack-run');
+  await run.focus();
+  await expect(run).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#div-intersection')).toBeVisible();
+  await expect(run).toBeFocused();
+
+  // Both result regions announce themselves rather than changing silently.
+  await expect(page.locator('#div-out')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#div-attack-out')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#div-out')).toHaveAttribute('role', 'status');
+
+  // Every table on the card has a caption and row headers, at every release.
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-twenty']) {
+    await page.selectOption('#div-release', release);
+    const tables = page.locator('#div-table .data-table, #div-out .data-table');
+    const count = await tables.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < count; i += 1) {
+      await expect(tables.nth(i).locator('caption')).not.toBeEmpty();
+      await expect(tables.nth(i).locator('tbody th[scope="row"]').first()).toBeVisible();
+    }
+  }
+});
+
+test('the release-criteria card fits the smallest supported width', async ({ page }) => {
+  // 375 x 667 is the width the guided-path reflow test uses, and the expert
+  // cards are not on that route, so this drives the new card there explicitly
+  // rather than leaving the narrowest case to the 380px axe sweep.
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  await page.click('#div-attack-run');
+  await expect(page.locator('#div-intersection')).toBeVisible();
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-twenty']) {
+    await page.selectOption('#div-release', release);
+    await expect(page.locator('#div-class-body tr').first()).toBeVisible();
+    const overflow = await page.evaluate(() => {
+      const root = document.documentElement;
+      return root.scrollWidth > root.clientWidth ? root.scrollWidth - root.clientWidth : 0;
+    });
+    expect(overflow, `horizontal overflow at 375px on release "${release}"`).toBe(0);
+  }
+  // Every wide table is still reachable, in its own focusable scroll region.
+  const scrollers = page.locator('#div-table .scroller, #div-out .scroller, #div-attack-out .scroller');
+  const count = await scrollers.count();
+  expect(count).toBeGreaterThanOrEqual(3);
+  for (let i = 0; i < count; i += 1) {
+    await expect(scrollers.nth(i)).toHaveAttribute('tabindex', '0');
+  }
+});
+
+test('the release-criteria card starts honest and says what has not run', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  // The attack panel shows no result before it is run, and says so.
+  await expect(page.locator('#div-attack-out')).toContainText('Run the attack');
+  await expect(page.locator('#div-intersection')).toHaveCount(0);
+  await page.click('#div-attack-run');
+  await expect(page.locator('#div-intersection')).toHaveCount(1);
 });

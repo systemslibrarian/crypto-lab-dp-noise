@@ -25,7 +25,7 @@ The one thing worth checking in advance is whether the group already believes "a
 ## Before the session
 
 0. **Know where the lesson lives.** The navigator after the intro is the spine: four ideas, the interaction that establishes each, and the exit question that tests each. Exactly one step is tagged **Start here** — the first not yet done — so if you lose your place mid-session, that tag is the answer. Steps tick over only when the learner runs the interaction themselves; dragging a linked ε in a different exhibit deliberately does not count.
-1. **Open the page and pick a route.** It opens on the **guided route**, which removes the expert panels (k-anonymity, the guessing experiment, the composition-rule chart, post-processing, the deployments panel and geo-indistinguishability). That is the right setting for the 15- and 30-minute routes. Switch to **Explore everything** for the 60-minute route.
+1. **Open the page and pick a route.** It opens on the **guided route**, which removes the expert panels (k-anonymity, the ℓ-diversity/t-closeness card and its intersection attack, the guessing experiment, the composition-rule chart, post-processing, the deployments panel and geo-indistinguishability). That is the right setting for the 15- and 30-minute routes. Switch to **Explore everything** for the 60-minute route.
 2. **Turn on classroom mode** if you are demonstrating rather than letting people drive. It is the checkbox at the foot of the intro section. Every sampled panel then draws from a generator seeded at a fixed value, so the run you rehearse is the run you get. The mechanisms and samplers are unchanged; only the sequence of draws is fixed, and every seeded panel says so on screen. Leave it **off** if learners are working on their own machines — an unrepeatable run is the honest default, and the label would otherwise be a distraction.
 3. **Decide whether you are driving.** The four core interactions take about a minute each to run live. The averaging attack at n = 2,000 takes noticeably longer than at n = 200, and the point lands at either.
 
@@ -57,6 +57,12 @@ Guided route, plus the two things that make the core path stick.
 Explore route. Add, in roughly this order:
 
 - **k-anonymity and the homogeneity attack** (Exhibit 1, second card). The natural follow-up to "so what should they have done instead?"
+- **ℓ-diversity and t-closeness** (Exhibit 1, third card). The follow-up to the follow-up, and the one that usually lands hardest, because it is a history of repairs that each failed. Budget 10–12 minutes and run it in this order:
+  1. Select **ZIP to three digits + age to twenty-year bands**. 2-anonymous, distinct ℓ = 1, one unanimous class. Ask what would fix it; someone will say "make sure there are several different values in each group", which is ℓ-diversity, and they will have derived it.
+  2. Select **age to ten-year bands**. Distinct 3-diverse now — and the 30–39 class holds three *different* bands that are all below $100,000. Ask whether that group is protected. This is the similarity attack, and the room usually sees it before you name it.
+  3. Select **ZIP to three digits**, then **age to twenty-year bands**. Both meet k ≥ 4, distinct ℓ ≥ 3 and t = 9/64 — the last one *at equality*, which is worth pointing at: the definition says "no more than t", so sitting on the line passes.
+  4. Compare the **utility table** between the ten-year and twenty-year releases. The release that fails t answers "how many are in their thirties?" exactly; the release that passes it answers `[0, 8]`. That is the cost, in one number, from the same rows.
+  5. Press **Publish both releases and intersect them**. Two compliant releases, and the target's band falls out exactly. Finish on the DP contrast underneath it.
 - **The guessing game** (Exhibit 3). Best done as a competition. Let someone play twenty rounds at ε = 5, then twenty at ε = 0.1, and put both scores next to the theoretical ceiling.
 - **The Gaussian and δ** (Exhibit 2, mechanism selector). Switch mechanisms and watch the ratio line sail straight through the rails.
 - **The composition rules** (Exhibit 5, chart card). Basic versus advanced, and the crossover.
@@ -74,7 +80,8 @@ Ordered roughly by where they fit.
 4. During the sensitivity exercise: *"Who at your organisation would sign off on the salary bound, and what would they base it on?"* (This is usually the moment the room realises the hard part is organisational.)
 5. After the averaging attack: *"Every one of those answers was correctly differentially private. What failed?"* (Nothing in the mechanism. The accounting around it.)
 6. After the refusal: *"Your dashboard is out of budget at 9am. What do you actually do?"* (There is no good answer, and finding that uncomfortable is the correct reaction. Options are: stop answering, serve cached prior releases, raise the budget and say so publicly, or re-scope the release. Note that "add more noise" is not among them.)
-7. Closing, if you reached Exhibit 6: *"The Census published ε = 17.14. e^17 is about 24 million. Is that privacy?"*
+7. After the intersection attack, if you reached the third card in Exhibit 1: *"Both hospitals followed the policy. Which one is responsible?"* (Neither, individually, which is the problem. The disclosure is a property of the pair, and no reviewer of either release could have seen it. That is the structural argument for constraining the mechanism rather than the table.)
+8. Closing, if you reached Exhibit 6: *"The Census published ε = 17.14. e^17 is about 24 million. Is that privacy?"*
 
 ## Expected misconceptions
 
@@ -87,13 +94,18 @@ These are the four the page is built to dislodge, with the evidence that dislodg
 | **"If we anonymise hard enough, we're fine."** | It is what most regulation still assumes. | Exhibit 1's k-anonymity card: generalise to k = 6 and watch every class stay unanimous. |
 | **"Each answer is private, so all the answers are private."** | Each answer genuinely *is* private. The claim is locally true and globally false. | Exhibit 5's averaging attack. Two thousand private answers, one true payroll. |
 
-A fifth, less common but worth watching for: **"a small ε means the attacker learns nothing."** It means they learn little about *any one person*. Population-level conclusions are what the release is *for*. The last card in the recap says this; say it out loud too.
+A fifth, for groups that get as far as the third card in Exhibit 1: **"so t-closeness is the fixed version."** It is the strongest of the three criteria on the page and it is still a property of one table. Show the intersection attack: two releases that each satisfy k, ℓ and t, and together they give up the target's band. The repairs are not converging on a guarantee; they are patching the examples that were found.
+
+A sixth, almost guaranteed if anyone is numerate: **"then just make t smaller."** Ask what t = 0 requires. On this table it requires every class to have the whole table's distribution, which the page's own utility column prices at losing the query entirely. Li et al. say of their own measure that the relationship between t and information gain is unclear, and give two pairs of distributions at the same EMD whose disclosure is obviously different.
+
+A seventh, less common but worth watching for: **"a small ε means the attacker learns nothing."** It means they learn little about *any one person*. Population-level conclusions are what the release is *for*. The last card in the recap says this; say it out loud too.
 
 ## Which interactions are stochastic
 
 Anything below will differ from run to run unless classroom mode is on. Plan around them, and never promise a specific number in advance.
 
 - **Exhibit 1, the differencing attack in DP mode** — five runs, five different recovered values. The exact-mode attack is deterministic and always recovers $142,000.
+- **Exhibit 1, the ℓ-diversity/t-closeness card** — *not* stochastic. Every band count, distance, verdict and intersection is an exact integer computation over sixteen fixed rows, so it is safe to promise a specific number in advance and safe to rehearse. It is the one card on the page where that is true.
 - **Exhibit 3, the sampled histograms** — 2,000 draws per world; the measured guess rate lands within about a point of the prediction.
 - **Exhibit 3, the guessing game** — a cryptographic coin picks the world. A short run can beat the theoretical ceiling by luck, and the page says so once someone does.
 - **Exhibit 4, releasing answers** — six independent draws. At small ε these can come back negative; that is not a bug and the page explains it when it happens.
@@ -121,6 +133,7 @@ Every learning objective on the page can be met without interpreting colour, mov
 - **Phone width is tested** at 375 × 667, including with every disclosure open, and fails on any horizontal overflow.
 - **Reduced motion** is respected: with `prefers-reduced-motion` set, the sampling animations compute in one pass instead of building across frames. The result is identical.
 - The **charts re-proportion** below 640px rather than letterboxing, and their type scales back up so it stays readable.
+- **The ℓ-diversity/t-closeness card has no chart at all.** Everything on it is a table with a caption and row headers, read in the tab order, in wide scroll regions that are themselves focusable. Its select and its one button are both keyboard-operable, and focus is asserted to survive the full re-render that a release change triggers.
 
 If you need a version with no interaction at all — for a slide deck, or for asynchronous reading — the data disclosures plus the recap section carry the entire argument in text.
 
