@@ -4,7 +4,8 @@
  * The k-anonymity card above this one ends with the homogeneity attack and the
  * sentence "Machanavajjhala et al. proposed ℓ-diversity as a repair, and it is
  * patched again by t-closeness". This card runs that repair, and the repair of
- * the repair, and then breaks both — on a second synthetic table declared for
+ * the repair, and then shows a repeated-release disclosure that neither
+ * single-table criterion rules out — on a second synthetic table declared for
  * the job, with every band count, distance and verdict computed from the rows
  * of the release selected.
  *
@@ -390,9 +391,9 @@ function wireIntersection(): void {
                 `secret the counting query in Exhibit 2 is built to protect.`
               : '.'),
           meaning:
-            'The attack needs two things and nothing else, both named by Ganta, Kasiviswanathan ' +
-            'and Smith: the sensitive values are published exactly, and the target’s class can ' +
-            'be located from attributes a stranger can look up. Here the published sensitive ' +
+            'The construction makes explicit the two properties Ganta, Kasiviswanathan and ' +
+            'Smith highlight: the sensitive values are published exactly, and the target’s class ' +
+            'can be located from stated background attributes. Here the published sensitive ' +
             'value is the salary band, not the raw salary: the class table exposes the exact band ' +
             'multiset, and the intersection uses its support. Those are design features of ' +
             'microdata publishing, not mistakes in these releases.',

@@ -336,8 +336,9 @@ export function answerAgeQuery(report: ReleaseReport, query: AgeQuery): QueryAns
  * The repeated-release (intersection) attack.
  *
  * Ganta, Kasiviswanathan and Smith, "Composition Attacks and Auxiliary
- * Information in Data Privacy", KDD 2008 (arXiv:0803.0032), §1.1.1, name the two
- * properties this needs and both hold here by construction:
+ * Information in Data Privacy", KDD 2008 (arXiv:0803.0032), §1.1.1, name two
+ * properties this bounded adaptation makes explicit, alongside linked releases
+ * of the same population and the stated target background:
  *
  *   (i) *exact sensitive value disclosure* — "the sensitive value corresponding
  *       to each member of the group is published exactly", which is what
