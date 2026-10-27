@@ -382,8 +382,8 @@ function wireIntersection(): void {
               ? `Each release separately holds k ≥ ${DECLARED_K}, distinct ℓ ≥ ${DECLARED_L} and ` +
                 `ordered t-closeness at t = ${tLabel}. `
               : 'At least one release fails the displayed policy, so this is not a two-compliant-release result. ') +
-            `The declared background knowledge is ${knowledge.description}. Neither release discloses the target ` +
-            `on its own. Intersecting the two candidate sets leaves ` +
+            `The declared background knowledge is ${knowledge.description}. Each release narrows the target, but ` +
+            `neither gives the exact band or high-earner answer on its own. Intersecting the two candidate sets leaves ` +
             `{${result.intersection.map((b) => b.id).join(', ')}}` +
             (result.disclosesHighEarner
               ? `, every member of which is above ${money(HIGH_EARNER_THRESHOLD)} — the same ` +

@@ -415,8 +415,9 @@ describe('the repeated-release intersection attack', () => {
     expect(bandOf(target().salary).id).toBe('b4');
   });
 
-  it('discloses nothing from either release alone', () => {
-    // The point of a composition attack: each release is fine by itself.
+  it('does not reveal the exact band or high-earner predicate from either release alone', () => {
+    // Each release still narrows the target, but neither settles the exact band
+    // or the declared high-earner predicate until their supports are combined.
     for (const r of [zip(), age()]) {
       const cls = classOfRecord(r, REGISTRY_TARGET_ID)!;
       expect(cls.candidateBands.length).toBeGreaterThan(1);

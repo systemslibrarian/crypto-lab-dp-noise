@@ -437,8 +437,8 @@ test('the intersection is the one the two rendered candidate sets imply', async 
   const expected = sets[0]!.filter((b) => sets[1]!.includes(b));
   await expect(page.locator('#div-intersection')).toHaveText(`{${expected.join(', ')}}`);
 
-  // Neither release discloses on its own: each candidate set straddles the
-  // $100,000 boundary, which is the b3/b4 edge.
+  // Neither release settles the exact band or high-earner predicate on its own:
+  // each candidate set straddles the $100,000 boundary, the b3/b4 edge.
   for (const set of sets) {
     expect(set.some((b) => b <= 'b3')).toBe(true);
     expect(set.some((b) => b >= 'b4')).toBe(true);
