@@ -33,8 +33,9 @@ import { complete, coreProgress, getState, subscribe, update } from './state';
 
 /** What the guided route sets aside, named so nothing looks concealed. */
 const EXPERT_MATERIAL =
-  'k-anonymity and the homogeneity attack, the guessing experiment, the composition rules and their crossover, ' +
-  'post-processing, the deployment accounting for Apple, RAPPOR and the 2020 Census, and geo-indistinguishability';
+  'k-anonymity and the homogeneity attack, \u2113-diversity and t-closeness with the two-release intersection ' +
+  'attack, the guessing experiment, the composition rules and their crossover, post-processing, the deployment ' +
+  'accounting for Apple, RAPPOR and the 2020 Census, and geo-indistinguishability';
 
 export function initPath(): void {
   stampNaturalOrder();

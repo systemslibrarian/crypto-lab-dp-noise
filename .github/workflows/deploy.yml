@@ -28,7 +28,7 @@ jobs:
       - run: npm ci
       - name: Unit tests (Vitest — samplers, mechanisms, composition, reference values)
         run: npm test
-      - name: Geo-indistinguishability mutation gate (clean baseline, named owning tests)
+      - name: Mutation gate (clean baseline, named owning tests; geo and release criteria)
         run: npm run test:mutations
       - name: Build (typecheck gates the build)
         run: npm run build

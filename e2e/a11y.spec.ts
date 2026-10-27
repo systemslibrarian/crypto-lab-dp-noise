@@ -14,7 +14,7 @@ import {
  * The lab is driven along everything it teaches, on BOTH of its routes.
  *
  * The guided route first, because that is what the page ships and it is a
- * genuinely different document — six panels removed with `hidden`, and
+ * genuinely different document — seven panels removed with `hidden`, and
  * Exhibit 5's cards physically re-ordered so the averaging attack comes before
  * the ledger. Within it: the skip link focused; the jargon glossary opened
  * through its summary; classroom mode on and off; each prediction check answered
@@ -30,7 +30,8 @@ import {
  * refusal; a reset; and the averaging attack recovering the true payroll.
  *
  * Then the route chooser, and the material the guided route had set aside:
- * k-anonymity at every generalisation, post-processing, the composition
+ * k-anonymity at every generalisation, the ℓ-diversity/t-closeness card at
+ * every release plus its intersection attack, post-processing, the composition
  * crossover, the deployments, the guessing experiment — including its disabled
  * prerequisite state, two thousand real releases, and ten rounds of the game —
  * and geo-indistinguishability through exact, invalid, sampled and repeated-path

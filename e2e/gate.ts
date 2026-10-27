@@ -46,7 +46,7 @@ export const NARROW = { width: 380, height: 800 };
  *     never once scanned the guided route as a reader receives it, and instead
  *     scanned a document with BOTH routes' content on screen at the same time —
  *     a page no visitor can load. This gate never touches `hidden`; it asserts
- *     the six panels are really gone on the guided route, drives that route in
+ *     the seven panels are really gone on the guided route, drives that route in
  *     full, then switches with the route chooser and drives the other one.
  *     Every `<details>` is opened by clicking its own `<summary>`.
  *
@@ -182,12 +182,13 @@ export async function assertSingleBanner(page: Page): Promise<void> {
   expect(banners, 'exactly one banner landmark').toBe(1);
 }
 
-/** The six panels the guided route sets aside, and what each one holds. */
+/** The seven panels the guided route sets aside, and what each one holds. */
 export const EXPERT_PANELS = [
   { sel: '#guess', holds: 'the guessing experiment' },
   { sel: '#wild', holds: 'the deployment accounting' },
   { sel: '#geo', holds: 'geo-indistinguishability and repeated location releases' },
   { sel: '#kanon-level', holds: 'k-anonymity and the homogeneity attack' },
+  { sel: '#div-release', holds: 'ℓ-diversity, t-closeness and the intersection attack' },
   { sel: '#dial-mean', holds: 'post-processing' },
   { sel: '#bud-composition', holds: 'the composition rules and their crossover' },
 ] as const;
@@ -214,9 +215,9 @@ export const EXPERT_PANELS = [
  *
  * The defaults are asserted at length because on this page they decide which
  * HALF of the document exists. It ships on the GUIDED route, and the guided
- * route deletes six panels — the guessing experiment, the deployments, the
- * k-anonymity attack, post-processing, and the composition crossover — with the
- * `hidden` attribute. The gate this replaces stripped that attribute before
+ * route deletes seven panels — the guessing experiment, the deployments, the
+ * k-anonymity attack, the ℓ-diversity/t-closeness card, post-processing, and
+ * the composition crossover — with the `hidden` attribute. The gate this replaces stripped that attribute before
  * every scan, so it never saw this state at all. It also ships `linked`, at
  * ε index 8 (ε = 1), on the `count-high` query, with classroom seeding OFF, with
  * `#kanon-level` already at its STRONGEST generalisation (`k3`, not `raw`), and
@@ -245,7 +246,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('#path .path__steps > li')).toHaveCount(4);
   await expect(page.locator('#objectives li')).toHaveCount(4);
 
-  // ── The shipped route is GUIDED, and it really does remove six panels ─────
+  // ── The shipped route is GUIDED, and it really does remove seven panels ───
   await expect(page.locator('#app')).toHaveAttribute('data-route', 'guided');
   const routes = page.locator('.path__route');
   await expect(routes.nth(0)).toHaveAttribute('aria-pressed', 'true');
@@ -783,7 +784,7 @@ async function openAllDisclosures(page: Page): Promise<number> {
   return opened;
 }
 
-/** Switch route with the chooser, and assert the six expert panels followed. */
+/** Switch route with the chooser, and assert the seven expert panels followed. */
 async function chooseRoute(page: Page, route: 'guided' | 'explore'): Promise<void> {
   const label = route === 'guided' ? 'Guided lesson' : 'Explore everything';
   await page.locator('.path__route').filter({ hasText: label }).click();
@@ -801,7 +802,7 @@ async function chooseRoute(page: Page, route: 'guided' | 'explore'): Promise<voi
  *
  *  - BOTH ROUTES ARE DRIVEN, GUIDED FIRST AND WITH CONTENT IN IT. The guided
  *    route is what the page ships, and it is a genuinely different document:
- *    six panels removed with `hidden`, and Exhibit 5's three cards physically
+ *    seven panels removed with `hidden`, and Exhibit 5's three cards physically
  *    re-appended so the averaging attack comes BEFORE the ledger. The gate this
  *    replaces stripped `[hidden]` before every scan, so it never measured the
  *    guided route at all — and it scanned a hybrid document, with both routes'
@@ -1041,7 +1042,7 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await openAllDisclosures(page);
   await scanAt('guided route, every disclosure open');
 
-  // ── Switch to Explore: six panels return, and the order changes back ─────
+  // ── Switch to Explore: seven panels return, and the order changes back ───
   await chooseRoute(page, 'explore');
   expect(await orderOf(), 'explore order restores the reference sequence').toEqual([
     'The ledger',
@@ -1069,6 +1070,24 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
     await expect(page.locator('#kanon-out .verdict')).toContainText('anonymous');
     await scanAt(`k-anonymity at generalisation "${level}"`);
   }
+
+  // ── L-R-11: the release criteria that answer k-anonymity, and their own
+  // failures. Every release is selected, because each renders a different
+  // verdict banner and a different equivalence-class table; then the
+  // intersection attack, which adds two more panels and a third banner.
+  await expect(page.locator('#div-table .data-table tbody tr')).toHaveCount(16);
+  for (const release of ['pairs', 'age-decade', 'zip3', 'age-split-30', 'age-twenty']) {
+    await page.selectOption('#div-release', release);
+    await expect(page.locator('#div-out .verdict')).toBeVisible();
+    await expect(page.locator('#div-class-body tr').first()).toBeVisible();
+    await expect(page.locator('#div-utility-body tr')).toHaveCount(2);
+    await scanAt(`release criteria for "${release}"`);
+  }
+  await page.selectOption('#div-release', 'age-decade');
+  await page.click('#div-attack-run');
+  await expect(page.locator('#div-intersection')).toContainText('b4');
+  await expect(page.locator('#div-attack-out .verdict')).toHaveCount(2);
+  await scanAt('the two-release intersection attack and the DP contrast');
 
   await page.click('#dial-mean');
   await expect(page.locator('#dial-mean-out .verdict--ok')).toContainText('the division was free');
