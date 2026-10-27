@@ -277,6 +277,16 @@ describe('the declared t, applied by cross-multiplication', () => {
       expect(r.meetsT, id).toBe(true);
     }
   });
+
+  it.each([
+    ['pairs', 29n, 64n],
+    ['age-decade', 17n, 64n],
+    ['zip3', 9n, 64n],
+    ['age-split-30', 9n, 64n],
+    ['age-twenty', 9n, 64n],
+  ])('pins the learner-visible maximum distance for %s', (id, n, d) => {
+    expect(frac(report(id).maxEmd)).toEqual({ n, d });
+  });
 });
 
 describe('distinct ℓ-diversity passes where t-closeness does not', () => {
