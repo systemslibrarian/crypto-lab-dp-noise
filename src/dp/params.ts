@@ -86,7 +86,7 @@ export const DEPLOYMENTS: readonly Deployment[] = [
     model: 'local',
     eps: 16,
     epsNote:
-      'Per-day, across use cases. Apple documented per-donation parameters but not a single global ε; researchers who reverse-engineered the shipping implementation measured a daily budget of about 14 on macOS 10.12 and 16 on iOS 10.',
+      'Per-day, across use cases. Apple documented per-donation parameters but not a single global ε; researchers who reverse-engineered the shipping implementation measured the daily budget the configuration permits as 16 on macOS 10.12 for the four initially announced applications. The loss actually reachable was lower on each platform they inspected: 6 per day on macOS 10.12.3, where DeepLink was not implemented, and 14 per day on iOS 10.1.1. The budget is renewed every day, so the device-lifetime loss grows with the number of days since opt-in.',
     provenance: 'measured',
     source: 'Tang, Korolova, Bai, Wang & Wang, "Privacy Loss in Apple\'s Implementation of Differential Privacy" (2017)',
     sourceUrl: 'https://arxiv.org/abs/1709.02753',

@@ -43,6 +43,22 @@ describe('deployments', () => {
     expect(DEPLOYMENTS.some((d) => d.model === 'global')).toBe(true);
   });
 
+  it('names the platform beside every Apple figure it quotes', () => {
+    // Tang, Korolova, Bai, Wang & Wang (arXiv:1709.02753) section 4.3: the
+    // configuration permits an overall daily privacy loss of 16 on MacOS
+    // 10.12; the loss actually reachable is "as large as 6 per day" on MacOS
+    // 10.12.3 (DeepLink is not implemented there) and "as large as 14 per day"
+    // on iOS 10.1.1. The note used to put 14 on macOS and 16 on iOS.
+    const apple = DEPLOYMENTS.find((d) => d.id === 'apple')!;
+    expect(apple.eps).toBe(16);
+    expect(apple.epsNote).toMatch(/16 on macOS 10\.12\b/);
+    expect(apple.epsNote).toMatch(/6 per day on macOS 10\.12\.3/);
+    expect(apple.epsNote).toMatch(/14 per day on iOS 10\.1\.1/);
+    // The swapped attribution must not come back in any form.
+    expect(apple.epsNote).not.toMatch(/14 on macOS/);
+    expect(apple.epsNote).not.toMatch(/16 on iOS/);
+  });
+
   it('derives RAPPOR\'s ε from the parameters the paper reports for Chrome', () => {
     const rappor = DEPLOYMENTS.find((d) => d.id === 'rappor')!;
     // Section 5.4: 128-bit Bloom filter, h = 2 hash functions, 32 cohorts,

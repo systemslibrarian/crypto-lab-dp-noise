@@ -469,3 +469,16 @@ test('the deterministic-release counterexample is computed, and keeps its scope'
   await expect(dp).toContainText('could never appear inside some differentially private mechanism');
   await expect(dp).toContainText('does not stop a release teaching true things about a population');
 });
+
+test('the recap quotes the averaging slider\'s own default, not a number it never runs', async ({
+  page,
+}) => {
+  // The recap card used to say "two thousand" -- the slider's maximum, not the
+  // count a reader who pressed the button actually averaged.
+  await page.goto('.');
+  await expect(page.locator('#avg-n')).toHaveValue('600');
+  await expect(page.locator('#avg-n-value')).toHaveText('600');
+  const card = page.locator('#recap .card', { hasText: 'Privacy is spent, not set' });
+  await expect(card).toContainText('Six hundred individually-private answers');
+  await expect(card).not.toContainText('Two thousand');
+});

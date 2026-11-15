@@ -116,7 +116,7 @@ The utility metric is one declared query, not a score: *"how many people are in 
 - The release that **fails** t (age decades) answers exactly: `[4, 4]`, ambiguity **0**.
 - The release that **passes** t (twenty-year bands) answers `[0, 8]`, ambiguity **8**, against a true answer of 4.
 
-That is the trade, derived from the rows of each release. Li et al. say the same thing about their own criterion: t-closeness "limits the amount of useful information that is released, as it limits information about the correlation between quasi-identifier attributes and sensitive attributes. However, this is precisely what one needs to limit."
+That is the trade, derived from the rows of each release. Li et al. say the same thing about their own criterion: requiring the two distributions to be close "would also limit the amount of useful information that is released, as it limits information about the correlation between quasi-identifier attributes and sensitive attributes. However, this is precisely what one needs to limit."
 
 ### Two compliant releases, one disclosed band
 
@@ -213,7 +213,7 @@ Then switch to **Explore everything** for the rest: play twelve rounds of the gu
 
 | Deployment | Model | ε | Provenance |
 | --- | --- | --- | --- |
-| Apple — keyboard and emoji telemetry | Local | ≈ 16/day | Measured by outside researchers ([Tang et al. 2017](https://arxiv.org/abs/1709.02753)) |
+| Apple — keyboard and emoji telemetry | Local | 16/day permitted on macOS 10.12; 6/day reachable on macOS 10.12.3 and 14/day on iOS 10.1.1 | Measured by outside researchers ([Tang et al. 2017](https://arxiv.org/abs/1709.02753)) |
 | Google RAPPOR — Chrome telemetry | Local | ε∞ ≈ 2.04 | Derived from the Chrome parameters in the paper's §5.4, f = 0.75 with h = 2 hash functions ([Erlingsson et al. 2014](https://arxiv.org/abs/1407.6981)) |
 | US Census 2020 — redistricting file | Global | 17.14 (persons file) + 2.47 (housing units) = 19.61 at δ = 10⁻¹⁰ | Published ([Census Bureau, 9 June 2021](https://www.census.gov/newsroom/press-releases/2021/2020-census-key-parameters.html)); budgeted as ρ = 2.56 + 0.07 = 2.63 in zCDP ([Abowd et al. 2022, §8.2](https://arxiv.org/abs/2204.08986)) |
 
