@@ -5,10 +5,10 @@
  * not quote them: each deployment's ε is put through the same
  * `worstCasePosterior` the rest of the page uses, so "Apple's ε = 16" becomes
  * "an even prior can move to 99.99% certainty" — which is a sentence a reader
- * can evaluate. The Census entry goes further and re-derives its own ε from the
- * ρ the Bureau actually budgeted in, landing on a different number than the one
- * published, which is a real and underappreciated fact about reading these
- * values.
+ * can evaluate. The Census entry goes further and re-derives the persons file's
+ * ε from the ρ the Bureau actually budgeted for it: one defensible conversion
+ * reproduces the published number and another lands three-quarters of a unit
+ * away, which is a real and underappreciated fact about reading these values.
  *
  * The column that matters most is provenance. A published ε, an ε measured by
  * outside researchers from a shipping binary, and an ε derived from a budget
@@ -134,34 +134,52 @@ function renderTable(): void {
 }
 
 function renderCensus(): void {
-  // The Bureau budgeted in ρ (zero-concentrated DP) and published an (ε, δ).
-  // Converting ρ ourselves lands somewhere else — not because anyone is wrong,
-  // but because the conversion is a choice.
-  const rho = 2.63;
+  // The Bureau budgeted in ρ (zero-concentrated DP) and published an (ε, δ) for
+  // each of the two files it released, so this compares like with like: the
+  // persons file's ρ against the persons file's ε. Converting ρ is still a
+  // choice, and the choice is what moves the number.
   const delta = 1e-10;
-  const standard = zcdpToDpStandard(rho, delta);
-  const tight = zcdpToDpTight(rho, delta);
-  const published = 17.14;
+  // Production settings for the 2020 redistricting data (Abowd et al.,
+  // arXiv:2204.08986, §8.2): ρ = 2.63 in all, 2.56 for the persons tables and
+  // 0.07 for housing units. Published 9 June 2021 as ε = 19.61 in all, 17.14
+  // for the persons file and 2.47 for housing units, each at δ = 1e-10.
+  const rhoPersons = 2.56;
+  const rhoHousing = 0.07;
+  const rhoTotal = rhoPersons + rhoHousing;
+  const publishedPersons = 17.14;
+  const publishedHousing = 2.47;
+  const publishedTotal = publishedPersons + publishedHousing;
+
+  const standard = zcdpToDpStandard(rhoPersons, delta);
+  const tight = zcdpToDpTight(rhoPersons, delta);
+  const standardTotal = zcdpToDpStandard(rhoTotal, delta);
+  const tightTotal = zcdpToDpTight(rhoTotal, delta).eps;
 
   const mount = byId('dep-census');
   clear(mount);
   mount.append(
     statRow(
       [
-        stat('Budget as set', `ρ = ${rho}`, 'zero-concentrated DP'),
+        stat('Budget as set', `ρ = ${num(rhoPersons, 2)}`, 'persons file, zero-concentrated DP'),
         stat('Standard conversion', num(standard, 2), 'ρ + 2√(ρ ln(1/δ))'),
         stat('Rényi-optimised', num(tight.eps, 2), `at α = ${num(tight.alpha, 2)}`),
-        stat('As published', num(published, 2), 'US Census Bureau'),
+        stat('As published', num(publishedPersons, 2), 'US Census Bureau, persons file'),
       ],
       'One mechanism, four ε labels',
     ),
     el('p', {
       class: 'note',
       text:
-        `All four rows describe the same 2020 redistricting release at δ = ${delta.toExponential(0)}. The Bureau's own ` +
-        `figure is tighter still than the optimised conversion here, because it used a numerical accountant rather than ` +
-        `a closed form. Nothing is wrong in any row — but a reader comparing "ε = 17.14" against another system's ` +
-        `"ε = 18.19" would be comparing accountants, not privacy. When you see an ε, ask what converted it.`,
+        `All four rows describe the persons file of the 2020 redistricting release at δ = ${delta.toExponential(0)}. ` +
+        `The Bureau's ${num(publishedPersons, 2)} is what the Rényi-optimised conversion gives at the production ρ ` +
+        `(${num(rhoPersons, 2)} is rounded; the exact setting reproduces ${num(publishedPersons, 2)}), while the standard ` +
+        `closed form puts the same file ${num(standard - publishedPersons, 2)} higher. The headline total is a label of a ` +
+        `third kind: ρ = ${num(rhoPersons, 2)} + ${num(rhoHousing, 2)} = ${num(rhoTotal, 2)} was published as ` +
+        `ε = ${num(publishedPersons, 2)} + ${num(publishedHousing, 2)} = ${num(publishedTotal, 2)}, adding the two files' ε, ` +
+        `where converting the summed ρ gives ${num(tightTotal, 2)} (Rényi-optimised) or ${num(standardTotal, 2)} (standard) — ` +
+        `and the Bureau's own paper calls converting the sum the more accurate route. Nothing is wrong in any row — but a ` +
+        `reader comparing "ε = ${num(publishedTotal, 2)}" against another system's "ε = ${num(tightTotal, 2)}" would be ` +
+        `comparing accountants, not privacy. When you see an ε, ask what converted it, and what was added up.`,
     }),
   );
 }

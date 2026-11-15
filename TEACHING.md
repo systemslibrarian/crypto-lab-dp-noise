@@ -67,7 +67,7 @@ Explore route. Add, in roughly this order:
 - **The Gaussian and δ** (Exhibit 2, mechanism selector). Switch mechanisms and watch the ratio line sail straight through the rails.
 - **The composition rules** (Exhibit 5, chart card). Basic versus advanced, and the crossover.
 - **Post-processing is free** (Exhibit 4). Two releases, one division, no extra cost.
-- **ε in the wild** (Exhibit 6). Ends the session on provenance: published, measured, derived — three different kinds of claim, and the Census's own ρ converting to three defensible ε.
+- **ε in the wild** (Exhibit 6). Ends the session on provenance: published, measured, derived — three different kinds of claim, and the Census's own ρ carrying three defensible ε: the 17.14 the Bureau published for the persons file, the 17.92 of the standard conversion, and a 19.61 headline reached by adding two files' ε rather than converting their summed ρ.
 - **Geo-indistinguishability** (Exhibit 7). Use this as the advanced metric-DP extension: first read the attained ε-per-kilometre bound, then run sampled utility, inspect the finite-grid border failure, and finish with four versus twelve repeated path releases. Budget another 10–15 minutes or substitute it for the deployments discussion.
 
 ## Discussion prompts
@@ -81,7 +81,7 @@ Ordered roughly by where they fit.
 5. After the averaging attack: *"Every one of those answers was correctly differentially private. What failed?"* (Nothing in the mechanism. The accounting around it.)
 6. After the refusal: *"Your dashboard is out of budget at 9am. What do you actually do?"* (There is no good answer, and finding that uncomfortable is the correct reaction. Options are: stop answering, serve cached prior releases, raise the budget and say so publicly, or re-scope the release. Note that "add more noise" is not among them.)
 7. After the intersection attack, if you reached the third card in Exhibit 1: *"Both publishers followed the policy. Which one is responsible?"* (Neither release, assessed alone, exposes the exact band. The disclosure is a property of the pair, which is the structural argument for constraining the release mechanism and its history rather than checking one table in isolation.)
-8. Closing, if you reached Exhibit 6: *"The Census published ε = 17.14. e^17 is about 24 million. Is that privacy?"*
+8. Closing, if you reached Exhibit 6: *"The Census published ε = 17.14 for the persons file. e^17 is about 24 million. Is that privacy?"*
 
 ## Expected misconceptions
 

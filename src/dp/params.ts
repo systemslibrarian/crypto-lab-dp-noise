@@ -106,11 +106,11 @@ export const DEPLOYMENTS: readonly Deployment[] = [
   {
     id: 'census',
     org: 'US Census Bureau',
-    what: '2020 Census redistricting file (PL 94-171) — the data that draws voting districts',
+    what: '2020 Census redistricting file (PL 94-171), persons tables — the data that draws voting districts',
     model: 'global',
     eps: 17.14,
     epsNote:
-      'The Bureau set its budget as ρ = 2.63 in zero-concentrated DP and published ε = 17.14 at δ = 10⁻¹⁰. This page converts ρ itself: the standard conversion gives 18.19 and the Rényi-optimised one 17.43, so even the published number depends on which conversion you accept.',
+      'The Bureau budgeted ρ = 2.56 for the persons file in zero-concentrated DP (0.07 more for housing units, 2.63 in all) and published ε = 17.14 for it at δ = 10⁻¹⁰, 19.61 with the housing units added. This page converts the persons file\'s ρ itself: the Rényi-optimised conversion reproduces 17.14 and the standard one gives 17.92, so even the published number depends on which conversion you accept — and the 19.61 total adds two files\' ε rather than converting their summed ρ, which would give 17.43.',
     provenance: 'published',
     source: 'US Census Bureau, 2020 Disclosure Avoidance System',
     sourceUrl: 'https://www.census.gov/programs-surveys/decennial-census/decade/2020/planning-management/process/disclosure-avoidance.html',
