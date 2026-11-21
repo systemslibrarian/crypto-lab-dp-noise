@@ -599,7 +599,9 @@
           <h3>The averaging attack — what happens with no budget at all</h3>
           <p>
             Ask the same question over and over and average the answers. Every individual answer is differentially
-            private; the average is not.
+            private at ε, and the average is still differentially private, but not at ε. Averaging is
+            post-processing, so it inherits the guarantee of all the releases taken together: by basic composition,
+            k answers at ε each give k·ε, which after enough repeats promises almost nothing.
           </p>
           <div class="controls">
             <div class="field field--grow">
