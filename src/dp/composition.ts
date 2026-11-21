@@ -43,8 +43,10 @@ export function basicComposition(spends: readonly Spend[]): CompositionResult {
  *   ε' = √(2·ln(1/δ')·Σεᵢ²) + Σ εᵢ(e^εᵢ − 1),   δ' added to Σδᵢ
  *
  * It buys a √k dependence instead of k by allowing a small extra failure
- * probability δ'. It only wins once k is reasonably large — the page plots the
- * crossover rather than claiming one rule is simply better.
+ * probability δ'. It is only the tighter bound once k is reasonably large — the
+ * page plots the crossover rather than claiming one rule is simply better. Both
+ * rules stay valid on either side of it; the crossover is where the smaller of
+ * the two changes, not where either formula stops holding.
  */
 export function advancedComposition(spends: readonly Spend[], deltaPrime: number): CompositionResult {
   if (!(deltaPrime > 0 && deltaPrime < 1)) throw new RangeError("need δ' ∈ (0,1)");
@@ -63,7 +65,9 @@ export function advancedComposition(spends: readonly Spend[], deltaPrime: number
 /**
  * What the analyst is actually charged: whichever valid rule gives the smaller
  * ε. Both are computed and both are reported — the point is that accounting is
- * a choice with consequences, not a constant.
+ * a choice with consequences, not a constant. The charge is a bound on privacy
+ * loss: it depends only on each release's ε, never on the answers, so it is not
+ * a measurement of what a particular run revealed.
  */
 export function bestComposition(spends: readonly Spend[], deltaPrime: number): CompositionResult {
   const basic = basicComposition(spends);

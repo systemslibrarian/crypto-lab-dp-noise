@@ -562,7 +562,8 @@
           <h3>The ledger</h3>
           <p>
             Ask questions and watch the budget deplete. Both composition rules are computed on every request and the
-            cheaper one is billed; a query that would overdraw is refused outright.
+            tighter one is billed; a query that would overdraw is refused outright. What is billed is a privacy
+            <em>bound</em> — the most these releases could reveal — not a measurement of what any one run did reveal.
           </p>
           <div class="controls">
             <div class="field">
@@ -588,7 +589,8 @@
           <h3>Two ways to add up privacy loss</h3>
           <p>
             Basic composition adds ε. Advanced composition grows as √k instead, in exchange for a small extra failure
-            probability δ′. Neither is simply better — the crossover is computed below.
+            probability δ′. Both are valid bounds on the same releases and neither is simply tighter — where the
+            two curves cross is computed below, and all that changes there is which bound is the smaller one.
           </p>
           <div id="bud-composition"></div>
         </div>

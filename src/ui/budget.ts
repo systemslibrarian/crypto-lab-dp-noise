@@ -2,9 +2,10 @@
  * Exhibit 5 — composition: the budget, and what happens without one.
  *
  * Two panels that argue with each other. The ledger is the well-behaved world:
- * every query is charged, both composition rules are computed, the cheaper one
+ * every query is charged, both composition rules are computed, the tighter one
  * is billed, and a query that would overdraw the budget is *refused* rather than
- * answered. The averaging attack is what the ledger is defending against — ask
+ * answered. What it charges is a privacy *bound* — the most the releases could
+ * reveal, by composition — never a measurement of what one run did reveal. The averaging attack is what the ledger is defending against — ask
  * the same question enough times without being charged and the noise averages
  * away, taking the privacy with it.
  *
@@ -113,7 +114,7 @@ function ask(a: Askable): void {
           'refusal is the security control; the ledger above it is only the bookkeeping that makes the refusal possible.',
         details: [
           'Answering "more noisily instead" is the tempting alternative and it does not work. The budget is already ' +
-            'spent; a further release adds further loss whatever its ε, and the composed total still exceeds what ' +
+            'spent; a further release raises the composed bound whatever its ε, and the total still exceeds what ' +
             'was promised. There is no noise level at which an over-budget answer becomes free.',
           'Reset the ledger, or raise the budget — but raising it is a decision about what you are promising people, ' +
             'not a way to get the answer you wanted. The ε at the top of this exhibit is the whole promise, and ' +
@@ -164,6 +165,14 @@ function renderLedger(): void {
       class: 'meter__caption mono',
       text: `${num(state.charged.eps, 3)} / ${num(state.budget, 2)} spent${state.exhausted ? ' — exhausted' : ''}`,
     }),
+    el('p', {
+      class: 'note',
+      text:
+        'Read "charged" as a bound, not a measurement. It is the largest privacy loss composition guarantees these ' +
+        'releases could add up to, for any person and any attacker. It is not how much this run actually revealed: ' +
+        'the ledger never looks at the answers, only at the ε each one was released under, so the same queries ' +
+        'cost the same whatever noise happened to be drawn.',
+    }),
   );
 
   if (state.spends.length) {
@@ -176,9 +185,9 @@ function renderLedger(): void {
             state.advanced ? num(state.advanced.eps, 3) : '—',
             `√(2 ln(1/δ′)·Σε²) + Σε(e^ε−1), δ′ = ${DELTA_PRIME.toExponential(0)}`,
           ),
-          stat('Charged', num(state.charged.eps, 3), 'the cheaper of the two'),
+          stat('Charged', num(state.charged.eps, 3), 'the tighter of the two bounds'),
         ],
-        'Both composition rules, computed independently',
+        'Both composition bounds, computed independently',
       ),
     );
   }
@@ -216,9 +225,10 @@ function renderLedger(): void {
 }
 
 function renderCompositionCurve(): void {
-  // The two rules as functions of k, at a fixed per-query ε. Neither is simply
-  // better: advanced composition pays a fixed √(2 ln(1/δ′)) toll up front and
-  // only earns it back once k is large.
+  // The two rules as functions of k, at a fixed per-query ε. Both are valid
+  // bounds at every k; neither is simply tighter. Advanced composition pays a
+  // fixed √(2 ln(1/δ′)) toll up front and only earns it back once k is large,
+  // so the crossover marks where the tighter bound changes — nothing more.
   const perQuery = 0.1;
   const basic: [number, number][] = [];
   const advanced: [number, number][] = [];
@@ -238,7 +248,8 @@ function renderCompositionCurve(): void {
     chart({
       ariaLabel:
         `Total ε against the number of queries, at ε = ${perQuery} each, under basic and advanced composition. ` +
-        `Basic is a straight line; advanced starts higher and grows as the square root, crossing at ${crossover} queries.`,
+        `Basic is a straight line; advanced starts higher and grows as the square root, becoming the tighter bound ` +
+        `at ${crossover} queries.`,
       xLabel: 'queries asked',
       yLabel: 'total ε charged',
       series: [
@@ -251,32 +262,35 @@ function renderCompositionCurve(): void {
     legend([
       { label: `basic composition — ε adds, k × ${perQuery}`, style: 'a', kind: 'line' },
       { label: 'advanced composition — √k, at the cost of a δ′', style: 'b', kind: 'line' },
-      { label: 'where advanced starts winning', style: 'ceiling', kind: 'line' },
+      { label: 'where advanced becomes the tighter bound', style: 'ceiling', kind: 'line' },
     ]),
     chartData({
-      caption: `Total ε charged after k queries at ε = ${perQuery} each, under both composition rules.`,
-      headers: ['Queries asked', 'Basic', 'Advanced', 'Cheaper rule'],
+      caption: `Total ε bound after k queries at ε = ${perQuery} each, under both composition rules.`,
+      headers: ['Queries asked', 'Basic', 'Advanced', 'Tighter bound'],
       rows: [1, 2, 5, 10, 20, 50, 100, 200, 400].map((k) => {
         const b = basic[k - 1][1];
         const a = advanced[k - 1][1];
         return [String(k), num(b, 3), num(a, 3), a < b ? 'advanced' : 'basic'];
       }),
       trend:
-        `Basic grows linearly and advanced grows as √k from a higher starting point, so advanced is more expensive ` +
-        `until k = ${crossover} and cheaper after it.`,
+        `Basic grows linearly and advanced grows as √k from a higher starting point, so advanced is the looser ` +
+        `bound below k = ${crossover} and the tighter one from there on.`,
       notice:
-        `Read the last column down the table. Neither rule is simply better, and the point at which they swap is a ` +
-        `property of the per-query ε and the δ′ you are willing to accept — not a constant. A ledger that hard-coded ` +
-        `either rule would overcharge in one regime and be invalid in the other, which is why the one above computes ` +
-        `both on every request and bills the cheaper.`,
+        `Read the last column down the table. Both columns are valid bounds in every row — basic with no added δ, ` +
+        `advanced at its δ′ — and where the curves cross neither formula stops being true; the only thing that ` +
+        `changes is which one gives the smaller number. That point is a property of the per-query ε and the δ′ you ` +
+        `are willing to accept, not a constant. A ledger that hard-coded either rule would still be correct, only ` +
+        `looser than it needs to be on one side of the crossing, which is why the one above computes both on every ` +
+        `request and bills the tighter.`,
     }),
     el('p', {
       class: 'note',
       text:
-        `Advanced composition is not free and not always better: below ${crossover} queries it charges more than simply ` +
-        `adding, and it only applies at all if you are willing to accept an extra failure probability δ′ = ` +
-        `${DELTA_PRIME.toExponential(0)}. The ledger above computes both every time and bills the cheaper one, which is ` +
-        `what a real accountant does.`,
+        `Advanced composition is not free and not always tighter: below ${crossover} queries its ε is larger than ` +
+        `simply adding, and its guarantee always carries an extra failure probability δ′ = ` +
+        `${DELTA_PRIME.toExponential(0)}. Crossing ${crossover} queries invalidates neither formula — both remain ` +
+        `true bounds on the same releases, and only which is tighter changes. The ledger above computes both every ` +
+        `time and bills the smaller ε, which is what a real accountant does.`,
     }),
   );
 }
@@ -396,9 +410,11 @@ function renderAveraging(
         'The error column falls by roughly a factor of ten for every hundredfold increase in queries asked, tracking ' +
         'the predicted column, while the ε column rises linearly.',
       notice:
-        'Read the error and the ε columns together. The attacker’s accuracy improves without bound while the privacy ' +
-        'cost rises without bound, and nothing in the mechanism stops either — the only thing that ever stops it is a ' +
-        'budget that refuses. That is the argument for composition accounting, stated as two columns.',
+        'Read the error and the ε columns together, and keep them apart: the error is what this run actually gave ' +
+        'away, and ε is only the bound composition can still promise. The attacker’s accuracy improves without ' +
+        'limit while that bound grows without limit, and nothing in the mechanism stops either — the only thing ' +
+        'that ever stops it is a budget that refuses. That is the argument for composition accounting, stated as ' +
+        'two columns.',
       sampled:
         `The "error" column is one real run of the exact sampler and will differ every time; the "predicted" column ` +
         `is the closed form b√2/√n with b = ${money(b)} and does not vary. Expect the measured column to wander ` +
@@ -415,7 +431,7 @@ function renderAveraging(
         stat('Queries asked', num(last.n), `of ${num(total)}`),
         stat('Running average', money(last.estimate), `true value ${money(trueValue)}`),
         stat('Error', money(last.absError), `one answer alone: about ${money(b)}`),
-        stat('ε spent', num(last.epsSpent, 1), `${epsEach} per query, basic composition`),
+        stat('ε spent', num(last.epsSpent, 1), `${epsEach} per query, basic composition bound`),
       ],
       'The averaging attack in progress',
     ),
@@ -429,8 +445,9 @@ function renderAveraging(
           `${money(last.absError)} of the true total — against ${money(b)} of typical error on any one of them.`,
         meaning:
           `Privacy is a property of what the analyst walks away with, not of the last answer they were handed. ` +
-          `Independent noise averages away at 1/√n, and by basic composition this transcript has spent ` +
-          `ε = ${num(last.epsSpent, 1)} — a number that describes essentially no privacy at all. This is what the ` +
+          `Independent noise averages away at 1/√n, and by basic composition the only guarantee left for this ` +
+          `transcript is ε = ${num(last.epsSpent, 1)} — a bound so loose it promises essentially no privacy at all. ` +
+          `The bound says how much could leak; the error above is how much this run did. This is what the ` +
           `ledger exists to prevent, and why it refuses rather than negotiates.`,
         details: [
           `Nothing malfunctioned. Every release was a correct, valid ε = ${epsEach} mechanism, and an auditor ` +
