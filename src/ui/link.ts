@@ -115,7 +115,7 @@ export function readout(): HTMLElement {
         stat('Query', q.label.replace(/\?$/, ''), 'the question being asked'),
         stat('Sensitivity Δ', fmt(q.sensitivity), 'declared, not measured'),
         stat('Noise scale b', fmt(b), 'Δ/ε, discrete Laplace'),
-        stat('Belief can reach', pct(worstCasePosterior(0.5, eps)), 'from an even prior'),
+        stat('Belief can reach', pct(worstCasePosterior(0.5, eps)), 'discrete Laplace, even prior'),
         stat(
           'One release would cost',
           `${num(cost.total, 3)} of ${num(cost.budget, 2)}`,
@@ -127,7 +127,7 @@ export function readout(): HTMLElement {
     el('p', { class: 'note readout__note' }, [
       el('strong', { text: 'Read it in this order. ' }),
       document.createTextNode(
-        'ε bounds how much one person can change the probability of any output; Δ measures how much one person can ' +
+        'For pure ε-DP, ε bounds how much one person can change the probability of any output; Δ measures how much one person can ' +
           'change this particular query; the mechanism combines them into the noise it adds; composition accounts for ' +
           'what repeated releases spend. ε is not an amount of noise — swap the query above and watch b move by five ' +
           'orders of magnitude while ε does not move at all.',

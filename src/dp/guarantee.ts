@@ -28,18 +28,15 @@ export interface RatioCurve {
   readonly points: readonly RatioPoint[];
   /** The largest ratio anywhere on the support we examined. */
   readonly maxRatio: number;
-  /** e^ε — the ceiling the definition promises. */
+  /** e^ε — the likelihood-ratio ceiling for pure ε-DP. */
   readonly ceiling: number;
   /** Whether every examined output honoured the ceiling. */
   readonly holds: boolean;
   /**
-   * The exact δ this mechanism needs at this ε: δ = Σₓ (Pr[M(D) = x] − e^ε·Pr[M(D′) = x])₊,
-   * maximised over the two directions.
-   *
-   * That sum is not an approximation of δ — it *is* δ, because the worst output
-   * set S is exactly the set of outputs where the ε promise fails, and the
-   * excess adds up over them. Zero for a pure ε mechanism; for the Gaussian it
-   * is the reason δ appears in the definition at all.
+   * Numerical minimum δ for this pair over the examined outputs. Sum the
+   * positive differences P(x) − e^ε Q(x) and take the larger of the two
+   * directions. Over the full support this maximises P(S) − e^ε Q(S) over
+   * all events S for the pair.
    */
   readonly deltaNeeded: number;
 }

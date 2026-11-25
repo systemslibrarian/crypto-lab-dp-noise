@@ -171,21 +171,18 @@ const QUESTIONS: readonly Question[] = [
           'every σ. That is a structural fact about Gaussian tails, not a calibration you can tighten your way out of.',
       },
       {
-        text: 'δ — the total probability of landing where the ε promise simply does not hold.',
+        text: 'δ bounds the excess of P(S) over e^ε Q(S) for any event S, in either direction.',
         correct: true,
         why:
-          'That is what δ is for, and it is worth being precise about what it is not. δ is not a small extra amount ' +
-          'of privacy loss and not a confidence level on ε; it is the probability mass on outputs where the ε bound ' +
-          'fails outright. A Gaussian tail falls faster than any exponential, so no finite ε can bound the ratio ' +
-          'everywhere — which is exactly why the Gaussian mechanism is (ε, δ) and the Laplace mechanism is not.',
+          'Take all outputs where P(x) exceeds e^ε Q(x). Subtract e^ε Q(x) at each of them and sum the differences. ' +
+          'Check the reverse comparison too. The larger sum gives the smallest δ for these two distributions.',
       },
       {
-        text: 'The failure rate of the sampler, which should be fixed rather than accounted for.',
+        text: 'δ equals the whole probability of seeing an output beyond the rail.',
         correct: false,
         why:
-          'Nothing has malfunctioned. The mechanism is behaving exactly as specified and the tail events are part of ' +
-          'the distribution it is supposed to have. Treating δ as a bug to be fixed rather than a parameter to be ' +
-          'declared and defended is how deployments end up quoting an ε that is not true of the mechanism they ran.',
+          'The tail also includes probability already allowed by e^ε Q(x). Only the excess counts toward δ. ' +
+          'Exhibit 2 displays both numbers for the same Gaussian tail.',
       },
     ],
   },
@@ -271,7 +268,7 @@ function renderResult(): void {
         'All four transferred',
         'You applied the model to four situations the page never ran: you separated ε from an amount of noise, ' +
           'treated a transcript rather than a release as the unit of privacy, kept a k guarantee distinct from ' +
-          'secrecy of the sensitive value, and read δ as the mass where the promise fails. That is the whole lesson.',
+          'secrecy of the sensitive value, and identified the excess probability bounded by δ.',
       ),
     );
     return;

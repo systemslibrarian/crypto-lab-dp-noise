@@ -64,7 +64,7 @@ Explore route. Add, in roughly this order:
   4. Compare the **utility table** between the ten-year and twenty-year releases. The release that fails t answers "how many are in their thirties?" exactly; the release that passes it answers `[0, 8]`. That is the cost, in one number, from the same rows.
   5. Press **Publish both releases and intersect them**. The attack uses the ZIP release and the age split at 30; both pass k, ℓ and t independently, and the target's band falls out exactly. Finish on the DP contrast underneath it.
 - **The guessing game** (Exhibit 3). Best done as a competition. Let someone play twenty rounds at ε = 5, then twenty at ε = 0.1, and put both scores next to the theoretical ceiling.
-- **The Gaussian and δ** (Exhibit 2, mechanism selector). Switch mechanisms and watch the ratio line sail straight through the rails.
+- **The Gaussian and δ** (Exhibit 2, mechanism selector). Switch mechanisms. Compare the probability of the tail under P with the excess left after subtracting e^ε Q on that tail.
 - **The composition rules** (Exhibit 5, chart card). Basic versus advanced, and the crossover. Say out loud that both are valid bounds on both sides of it — the crossover is only where the tighter one changes — and that the ledger's "charged" figure is a bound on what could be revealed, not a measurement of what a run did reveal.
 - **Post-processing is free** (Exhibit 4). Two releases, one division, no extra cost.
 - **ε in the wild** (Exhibit 6). Ends the session on provenance: published, measured, derived — three different kinds of claim, and the Census's own ρ carrying three defensible ε: the 17.14 the Bureau published for the persons file, the 17.92 of the standard conversion, and a 19.61 headline reached by adding two files' ε rather than converting their summed ρ.
@@ -75,7 +75,7 @@ Explore route. Add, in roughly this order:
 Ordered roughly by where they fit.
 
 1. After the differencing attack: *"The system's rule was 'only aggregates, never an individual'. Was that rule badly written, or is the whole idea broken?"* (Broken. No aggregate-selection policy survives subtraction.)
-2. After Exhibit 2: *"If ε = 1 lets an attacker's belief move from 50% to 73%, is that a lot?"* (There is no answer. That is the point — the number has to be argued for in context, and the page refuses to supply a "good" ε.)
+2. After Exhibit 2: *"If a pure ε-DP release at ε = 1 lets an observer’s belief move from 50% to 73%, is that a lot?"* (There is no answer. That is the point — the number has to be argued for in context, and the page refuses to supply a "good" ε.)
 3. After the sensitivity comparison: *"Two companies both say 'we use ε = 1'. What do you still need to know?"* (The query, its sensitivity, how the bound was chosen, how many releases, and the trust model.)
 4. During the sensitivity exercise: *"Who at your organisation would sign off on the salary bound, and what would they base it on?"* (This is usually the moment the room realises the hard part is organisational.)
 5. After the averaging attack: *"Every one of those answers was correctly differentially private. What failed?"* (Nothing in the mechanism. The accounting around it.)
@@ -121,7 +121,7 @@ Four scenarios, none of which appears elsewhere on the page. The correct option 
 1. **Two teams, same ε, different queries.** Team B's revenue total is noisier, and they have not told you the declared bound on one contributor's revenue. Without Δ, an ε does not determine the noise, the accuracy, or whether the calibration was legitimate.
 2. **A dashboard answering once a minute forever.** Each answer is private at ε = 0.1; the transcript is not private at any useful ε. A day costs 144 by basic composition, and averaging recovers the true value. Privacy is a property of what the analyst walks away with.
 3. **Names removed, every row matching nine others.** Guaranteed: no unique identification from those columns. Not guaranteed: secrecy of the sensitive value, because nothing requires the ten records to disagree. That is the homogeneity attack.
-4. **A Gaussian exceeding e^ε only in rare tails.** δ, which is the total probability of landing where the ε promise simply fails — not a small extra loss and not a confidence level. Raising σ does not fix it: the log-ratio of two Gaussians is a straight line and crosses any rail eventually.
+4. **A Gaussian exceeding e^ε in the tails.** For each tail output where P(x) > e^ε Q(x), subtract e^ε Q(x) from P(x). Sum those differences and check the reverse direction. The larger sum is the minimum δ for that pair. Ask students to read both the tail probability and the excess from Exhibit 2 and explain why they differ.
 
 ## Accessibility alternatives
 

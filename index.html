@@ -147,11 +147,9 @@
           <h1 class="cl-hero-title">DP Noise</h1>
           <p class="cl-hero-sub">Differential privacy · ε-δ · Laplace mechanism</p>
           <p class="cl-hero-desc">
-            Runs the real Laplace and Gaussian mechanisms over a twelve-person payroll so you can watch what DP
-            actually promises about two databases that differ by one person: not that they become impossible to tell
-            apart, but that an attacker's odds of telling them apart move by at most a factor of e^ε. Watch that cap
-            tighten as ε shrinks, see exactly how often the optimal attacker still wins — and watch the guarantee
-            break when you spend the budget.
+            Compare noisy counts from two payrolls that differ by one person. With discrete Laplace noise, ε bounds
+            how much a release can change the odds between those two possibilities. Switch to Gaussian noise to see
+            how δ enters the guarantee, then explore what repeated releases cost.
           </p>
         </div>
         <aside class="cl-hero-why" aria-label="Why it matters">
@@ -194,15 +192,14 @@
           <dl class="glossary">
             <dt>ε (epsilon)</dt>
             <dd>
-              The privacy parameter. It bounds a <em>ratio</em>: for every possible output, the probability of seeing
-              that output changes by a factor of at most e^ε when one person is added to or removed from the data. It
-              is not a probability, and it is not an amount of noise.
+              Under pure ε-DP, adding or removing one person changes the probability of any output event by at
+              most a factor of e^ε.
             </dd>
             <dt>δ (delta)</dt>
             <dd>
-              A small allowance for the ε promise to fail outright. Pure ε-DP has δ = 0; the Gaussian mechanism needs a
-              non-zero δ because a Gaussian's tails are too light for any e^ε ceiling to hold everywhere. Exhibit 2
-              shows exactly where it breaks.
+              An additive allowance in the event bound P(S) ≤ e^ε Q(S) + δ, where P and Q are the output
+              distributions for neighbouring databases. The bound applies to every event S in both directions.
+              Pure ε-DP sets δ to zero.
             </dd>
             <dt>Neighbouring databases</dt>
             <dd>
@@ -357,10 +354,9 @@
           answers. Those two distributions are the first chart.
         </p>
         <p class="lede">
-          Differential privacy is one inequality about those two curves: at every possible output, the probability
-          under one world is at most e^ε times the probability under the other. The second chart is that ratio, drawn
-          between rails at ±ε. Drag ε and watch it step from one rail to the other and stop dead — then switch to the
-          Gaussian and watch it sail straight through, which is the entire reason δ exists.
+          The second chart shows the log of the probability with Alice divided by the probability without her.
+          Pure ε-DP keeps it between −ε and +ε. Switch from Laplace to Gaussian noise and watch it cross the rails.
+          The panel below measures how much excess probability the Gaussian needs δ to cover.
         </p>
 
         <div class="controls">
@@ -393,7 +389,7 @@
         <div class="card card--viz">
           <h3>The ratio, and its rails</h3>
           <p>
-            The log of the likelihood ratio between the two worlds, at each output. The definition says this line must
+            The log of the likelihood ratio between the two worlds, at each output. Pure ε-DP requires this line to
             stay between −ε and +ε — and for the Laplace mechanism it does not merely stay inside, it sits <em>on</em>
             the rails, which is what a tight ε looks like.
           </p>
@@ -474,7 +470,7 @@
 
         <div class="card">
           <h3>Release an answer</h3>
-          <p>Six independent releases of the same question. They differ every time; that is the mechanism working.</p>
+          <p>Compare six releases of the same question. Independent noisy draws can repeat. Exact answers always repeat.</p>
           <div class="btn-row">
             <button class="btn" id="dial-release" type="button">Release six answers</button>
           </div>
@@ -752,16 +748,16 @@
           <div class="card">
             <h3>2 · ε bounds a ratio, not a noise level</h3>
             <p>
-              For every possible output, the two worlds differ in probability by at most e^ε. The chart in Exhibit 2
+              Under pure ε-DP, the ratio of the two output probabilities is at most e^ε in either direction. The chart in Exhibit 2
               shows the ratio reaching that ceiling and stopping — tight, not merely respected.
             </p>
           </div>
           <div class="card">
             <h3>3 · That ratio bounds belief</h3>
             <p>
-              Bayes turns e^ε into a limit on what anyone can conclude: an even prior cannot move past
-              e^ε/(1+e^ε), whatever they see and whatever else they know. That is the sentence ε actually buys, and it
-              is what the guessing game in Exhibit 3 measures.
+              If the two neighbouring payrolls are equally likely before a release, pure ε-DP limits the posterior
+              probability of either to e^ε/(1+e^ε). Under Gaussian noise a sufficiently rare count can move that
+              probability arbitrarily close to one.
             </p>
           </div>
           <div class="card">
@@ -835,7 +831,7 @@
               Canonne–Kamath–Steinke rejection, both using only rational Bernoulli draws. Payroll ε is an exact
               rational, never a float. The geo exhibit uses the same cryptographic randomness but explicitly samples
               an ideal continuous density with IEEE-754 numbers; it does not call that exact. Sensitivity is computed
-              from a declared clamp; the e^ε bound, the exact δ, and the optimal distinguishing rate are all computed
+              from a declared clamp; the e^ε bound, the numerical δ for the two distributions, and the optimal distinguishing rate are all computed
               from the mechanism's own PMF. The repository's
               <a href="https://github.com/systemslibrarian/crypto-lab-dp-noise/actions/workflows/deploy.yml">current CI run</a>
               executes the full Vitest suite before it can build or deploy; that suite includes reference values for Φ

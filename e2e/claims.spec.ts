@@ -482,3 +482,70 @@ test('the recap quotes the averaging slider\'s own default, not a number it neve
   await expect(card).toContainText('Six hundred individually-private answers');
   await expect(card).not.toContainText('Two thousand');
 });
+
+test('Gaussian tail probability, excess and posterior follow the selected mechanism', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  const verdict = page.locator('#def-guarantee');
+  const belief = page.locator('#def-out');
+
+  // With Alice the count is 6, without her it is 5. Check both sides of the step.
+  for (const [count, signedLog] of [[5, -1], [6, 1]]) {
+    const row = page.locator('#def-ratio tbody tr').filter({ has: page.getByText(String(count), { exact: true }) });
+    const cells = row.locator('td');
+    expect(Number(await cells.nth(2).textContent())).toBeCloseTo(Math.exp(signedLog), 4);
+    expect(Number(await cells.nth(3).textContent())).toBe(signedLog);
+  }
+  await expect(belief).toContainText('73.1%');
+  await page.selectOption('#def-mech', 'gaussian');
+  // Independent reference: bisect the continuous normal-CDF calibration, round
+  // variance up to 0.0001 and normalise the integer weights over ±16σ.
+  for (const [stop, tail, excess] of [
+    ['6', '2.4415e-4', '9.9865e-6'],
+    ['8', '1.4199e-4', '1.0345e-5'],
+    ['10', '7.2138e-5', '1.1031e-5'],
+    ['14', '2.6308e-4', '1.0623e-6'],
+  ]) {
+    await page.locator('#def-eps').fill(stop);
+    await expect(verdict).toContainText(`tail probability under P is ${tail}`);
+    await expect(verdict).toContainText(`minimum δ for these two distributions is approximately ${excess}`);
+    await expect(belief).toContainText('Arbitrarily close to 100%');
+  }
+  await page.locator('#def-eps').fill('8');
+  await page.selectOption('#def-mech', 'laplace');
+  await expect(belief).toContainText('73.1%');
+  await expect(belief).not.toContainText('Arbitrarily close');
+  const question = page.locator('.exit__q').filter({ has: page.locator('#x-delta-q') });
+  await page.locator('#x-delta-2').click();
+  await expect(question.getByRole('status')).toContainText('Not quite');
+  await page.locator('#x-delta-1').click();
+  await expect(question.getByRole('status')).toContainText('Correct');
+  await expect(question.getByRole('status')).toContainText('sum the differences');
+});
+
+test('privacy dial uses the selected mechanism for certainty and its 95% error interval', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('.path__route', { hasText: 'Explore everything' }).click();
+  const out = page.locator('#dial-out');
+  const selected = page.locator('#dial-curve tbody tr').filter({ hasText: '← selected' });
+  const cells = selected.locator('td');
+  await page.locator('#dial-eps').fill('14');
+  // For ε = 10, P(no Laplace noise) = tanh(5) > 0.95.
+  expect(Math.tanh(5)).toBeGreaterThan(0.95);
+  await expect(cells.nth(0)).toHaveText('0');
+  await expect(out).toContainText('±0');
+  await page.locator('#dial-eps').fill('8');
+  await expect(cells.nth(0)).toHaveText('3');
+  await expect(cells.nth(1)).toHaveText('73.1%');
+  await page.selectOption('#dial-mech', 'discrete-gaussian');
+  await expect(cells.nth(0)).toHaveText('7');
+  await expect(cells.nth(1)).toHaveText('Arbitrarily close to 100%');
+  await expect(out).toContainText('Arbitrarily close to 100%');
+  await page.selectOption('#dial-mech', 'exact');
+  await expect(cells.nth(0)).toHaveText('0');
+  await expect(cells.nth(1)).toHaveText('100%');
+  await expect(out).toContainText('if the two true answers differ');
+  await page.selectOption('#dial-mech', 'continuous-laplace');
+  await expect(cells.nth(1)).toHaveText('73.1%');
+  await expect(out).toContainText('ideal continuous model only');
+});

@@ -99,8 +99,7 @@ export function gaussianSigma(spec: MechanismSpec): number {
  * σ² as an exact rational in *lattice steps*, rounded up to the next 1/10000 so
  * the sampled σ is never smaller than the calibrated one.
  */
-function sigmaSquaredRational(spec: MechanismSpec, lat: Lattice): Rational {
-  const sigmaSteps = gaussianSigma(spec) / lat.grid;
+export function latticeVariance(sigmaSteps: number): Rational {
   const v = sigmaSteps * sigmaSteps;
   return rat(BigInt(Math.ceil(v * 10_000)), 10_000n);
 }
@@ -127,7 +126,7 @@ export function release(rng: Rng, spec: MechanismSpec, trueValue: number): Relea
       scale = laplaceScale(spec);
       break;
     case 'discrete-gaussian':
-      noise = lat.grid * sampleDiscreteGaussian(rng, sigmaSquaredRational(spec, lat));
+      noise = lat.grid * sampleDiscreteGaussian(rng, latticeVariance(gaussianSigma(spec) / lat.grid));
       scale = gaussianSigma(spec);
       break;
     case 'continuous-laplace':

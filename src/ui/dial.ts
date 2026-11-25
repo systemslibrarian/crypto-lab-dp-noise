@@ -26,6 +26,7 @@ import { discreteGaussianPmf, discreteLaplacePmf } from '../dp/discrete';
 import {
   gaussianSigma,
   lattice,
+  latticeVariance,
   laplaceScale,
   MECHANISM_LABELS,
   release,
@@ -68,20 +69,20 @@ function utility(spec: MechanismSpec): { meanAbs: number; interval: number } {
   }
   if (spec.kind === 'exact') return { meanAbs: 0, interval: 0 };
   const gaussian = spec.kind === 'discrete-gaussian';
-  const sigmaSteps = gaussian ? gaussianSigma(spec) / lat.grid : 0;
+  const sigmaSteps = gaussian ? Math.sqrt(toNumber(latticeVariance(gaussianSigma(spec) / lat.grid))) : 0;
   const gamma = toNumber(lat.gamma);
   const span = gaussian ? Math.ceil(9 * sigmaSteps) + 10 : Math.ceil(24 / gamma) + 10;
   let meanAbs = 0;
   let mass = 0;
-  let interval = 0;
+  let interval: number | undefined;
   for (let k = 0; k <= span; k++) {
     const p = gaussian ? discreteGaussianPmf(sigmaSteps, k) : discreteLaplacePmf(gamma, k);
     const weight = k === 0 ? p : 2 * p;
     meanAbs += weight * k;
     mass += weight;
-    if (interval === 0 && mass >= 0.95) interval = k;
+    if (interval === undefined && mass >= 0.95) interval = k;
   }
-  return { meanAbs: meanAbs * lat.grid, interval: (interval || span) * lat.grid };
+  return { meanAbs: meanAbs * lat.grid, interval: (interval ?? span) * lat.grid };
 }
 
 export function initDial(): void {
@@ -136,9 +137,23 @@ export function initDial(): void {
   render();
   clear(byId('dial-release-out'));
   byId('dial-release-out').append(
-    verdict('idle', 'No answer released yet', 'Release one and it will differ every time, by design.'),
+    verdict('idle', 'No answer released yet', 'Release six answers to compare their values.'),
   );
 }
+
+/** Posterior for two equally likely neighbours with different answers. */
+function beliefAt(kind: MechanismKind, eps: number): string {
+  if (kind === 'discrete-gaussian') return 'Arbitrarily close to 100%';
+  if (kind === 'exact') return '100%';
+  return pct(worstCasePosterior(0.5, eps));
+}
+
+const beliefNote: Record<MechanismKind, string> = {
+  'discrete-laplace': 'pure-DP upper bound, even prior',
+  'discrete-gaussian': 'limiting value in the tails, even prior',
+  'continuous-laplace': 'ideal continuous model only, even prior',
+  exact: 'if the two true answers differ',
+};
 
 function renderReadout(spec: MechanismSpec, queryId: string): void {
   const q = queryById(queryId);
@@ -154,17 +169,17 @@ function renderReadout(spec: MechanismSpec, queryId: string): void {
 
   const stats = [
     stat('Sensitivity Δ', fmt(q.sensitivity), 'what one person can move'),
-    stat('ε', String(eps), 'privacy parameter'),
+    stat('ε', spec.kind === 'exact' ? 'Unused' : String(eps), 'privacy parameter'),
   ];
   if (spec.kind === 'discrete-gaussian') {
-    stats.push(stat('σ', fmt(gaussianSigma(spec)), `at δ = ${DELTA.toExponential(0)}`));
+    stats.push(stat('σ', fmt(gaussianSigma(spec)), `continuous target δ = ${DELTA.toExponential(0)}`));
   } else if (spec.kind !== 'exact') {
     stats.push(stat('Noise scale b = Δ/ε', fmt(laplaceScale(spec)), 'Laplace'));
   }
   stats.push(
     stat('Typical error', fmt(u.meanAbs), 'mean absolute noise'),
     stat('95% of answers land within', `±${fmt(u.interval)}`, `of the true ${fmt(trueValue)}`),
-    stat('Attacker belief can reach', pct(worstCasePosterior(0.5, eps)), 'from an even prior'),
+    stat('Belief after one release', beliefAt(spec.kind, eps), beliefNote[spec.kind]),
   );
   out.append(statRow(stats, 'Privacy parameters and the utility they cost'));
 
@@ -351,29 +366,39 @@ function renderMean(epsIndex: number, kind: MechanismKind): void {
 
 function renderCurve(queryId: string, kind: MechanismKind, epsIndex: number): void {
   const asMoney = queryId === 'sum-salary';
-  const drawKind: MechanismKind = kind === 'exact' ? 'discrete-laplace' : kind;
-  const points: [number, number][] = [];
-  const posterior: [number, number][] = [];
-  EPS_LADDER.forEach((text, i) => {
+  const gaussian = kind === 'discrete-gaussian';
+  const exact = kind === 'exact';
+  const values = EPS_LADDER.map((text, i) => {
     const eps = Number(text);
-    points.push([eps, utility(specFor(queryId, i, drawKind)).interval]);
-    posterior.push([eps, worstCasePosterior(0.5, eps) * 100]);
+    const spec = specFor(queryId, i, kind);
+    return {
+      eps,
+      interval: utility(spec).interval,
+      scale: exact ? 0 : gaussian ? gaussianSigma(spec) : laplaceScale(spec),
+      belief: beliefAt(kind, eps),
+    };
   });
-
+  const points: [number, number][] = values.map(({ eps, interval }) => [eps, interval]);
+  const posterior: [number, number][] = values.map(({ eps }) =>
+    [eps, gaussian || exact ? 100 : 100 * worstCasePosterior(0.5, eps)]);
+  const scaleLabel = gaussian ? 'Calibrated σ' : exact ? 'Noise added' : 'Laplace scale b';
+  const beliefDescription = gaussian
+    ? 'With Gaussian noise, the posterior can approach 100% in the tails at every ε.'
+    : exact
+      ? 'An exact count distinguishes two different true answers with certainty at every slider position.'
+      : 'Under the Laplace model, the pure-DP posterior bound rises with ε. Both neighbouring worlds start equally likely.';
+  const logInterval = values.every(({ interval }) => interval > 0);
   const current = Number(EPS_LADDER[epsIndex]);
   const mount = byId('dial-curve');
   clear(mount);
   mount.append(
     chart({
       ariaLabel:
-        'The width of the 95% interval as ε rises, on a logarithmic vertical axis. Smaller ε means stronger privacy ' +
-        'and a wider interval.',
+        `The 95% error interval for ${MECHANISM_LABELS[kind]} at each ε.`,
       xLabel: 'ε',
       yLabel: asMoney ? '±95% interval ($)' : '±95% interval',
-      yLog: true,
-      yMin: 1,
-      // ε spans 0.01 to 10; on a linear axis the entire interesting end is a
-      // smear against the left margin.
+      yLog: logInterval,
+      yMin: logInterval ? Math.min(...values.map(v => v.interval)) : 0,
       xLog: true,
       series: [{ id: 'err', label: 'error', kind: 'line', style: 'a', points }],
       markers: [{ x: current, label: `ε = ${current}`, style: 'ceiling' }],
@@ -383,11 +408,9 @@ function renderCurve(queryId: string, kind: MechanismKind, epsIndex: number): vo
       yTickFormat: (v) => (asMoney ? compactMoney(v) : num(v)),
     }),
     chart({
-      ariaLabel:
-        'How far an attacker\'s belief can move, as ε rises, starting from an even prior. It climbs from 50% toward ' +
-        'certainty.',
+      ariaLabel: beliefDescription,
       xLabel: 'ε',
-      yLabel: 'belief can reach (%)',
+      yLabel: gaussian ? 'limiting belief (%)' : 'belief bound (%)',
       yMin: 40,
       yMax: 100,
       xLog: true,
@@ -399,37 +422,22 @@ function renderCurve(queryId: string, kind: MechanismKind, epsIndex: number): vo
     }),
     legend([
       { label: 'how wrong the answer is (95% interval)', style: 'a', kind: 'line' },
-      { label: 'how much an attacker can conclude (worst-case belief)', style: 'b', kind: 'line' },
+      { label: beliefNote[kind], style: 'b', kind: 'line' },
       { label: 'the ε you have selected', style: 'ceiling', kind: 'line' },
     ]),
     chartData({
-      caption: `Both sides of the trade at every stop on the ε ladder, for "${queryById(queryId).label}".`,
-      headers: ['ε', '±95% interval', 'Belief can reach', 'Noise scale b = Δ/ε'],
-      rows: EPS_LADDER.map((text, i) => {
-        const eps = Number(text);
-        const s = specFor(queryId, i, drawKind);
-        return [
-          text + (i === epsIndex ? '  ← selected' : ''),
-          asMoney ? compactMoney(utility(s).interval) : num(utility(s).interval),
-          pct(worstCasePosterior(0.5, eps)),
-          asMoney ? compactMoney(laplaceScale(s)) : num(laplaceScale(s), 2),
-        ];
-      }),
-      trend:
-        'As ε rises the interval shrinks roughly in proportion to 1/ε while the attacker’s belief bound climbs from ' +
-        '50% toward certainty — the two columns move in opposite directions at every row.',
-      notice:
-        `There is no row where both columns are good, which is the entire subject. Then change the query above and ` +
-        `read the table again: the belief column is identical, because it depends only on ε, and the interval column ` +
-        `moves by five orders of magnitude, because it depends on Δ. That is the difference between what ε promises ` +
-        `and what the mechanism costs.`,
-    }),
-    el('p', {
-      class: 'note',
-      text:
-        'These are the same axis read two ways, and no value of ε is right for both. That is the whole subject: ' +
-        'differential privacy does not remove the trade-off between a useful answer and a private one, it makes the ' +
-        'trade-off a number you have to write down and defend.',
+      caption: `Error and belief for ${MECHANISM_LABELS[kind]} at every ε, for “${queryById(queryId).label}”.`,
+      headers: ['ε', '±95% interval', gaussian ? 'Limiting belief' : 'Belief can reach', scaleLabel],
+      rows: values.map((v, i) => [
+        String(v.eps) + (i === epsIndex ? '  ← selected' : ''),
+        asMoney ? compactMoney(v.interval) : num(v.interval),
+        v.belief,
+        asMoney ? compactMoney(v.scale) : num(v.scale, 2),
+      ]),
+      trend: beliefDescription,
+      notice: exact
+        ? 'Without noise, the error interval is zero and changing ε has no effect.'
+        : 'Compare the error intervals for the count and the payroll. The query sensitivity sets the units of the noise.',
     }),
   );
 }

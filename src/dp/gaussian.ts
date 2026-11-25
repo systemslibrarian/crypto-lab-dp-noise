@@ -4,7 +4,7 @@
  * The Gaussian mechanism cannot give pure ε-DP: a Gaussian's tails fall faster
  * than any exponential, so the likelihood ratio between neighbouring answers
  * grows without bound out in the tail. (ε, δ)-DP is the repair — δ is a budget
- * for the outcomes where the e^ε promise is allowed to fail. Exhibit 2 draws
+ * for the excess of P(S) over e^ε Q(S) for any output event S. Exhibit 2 draws
  * that unbounded ratio next to Laplace's flat ceiling; this file computes the
  * numbers underneath it.
  */

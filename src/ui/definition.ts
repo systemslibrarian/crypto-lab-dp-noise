@@ -17,7 +17,7 @@ import { countHighEarners, EMPLOYEES, TARGET_ID, without } from '../dp/database'
 import { discreteGaussianPmf, discreteLaplacePmf } from '../dp/discrete';
 import { analyticSigma } from '../dp/gaussian';
 import { logRatio, optimalGuessRate, ratioCurve, type CurveSpec } from '../dp/guarantee';
-import { worstCasePosterior } from '../dp/mechanism';
+import { latticeVariance, worstCasePosterior } from '../dp/mechanism';
 import { epsAt, EPS_DEFAULT_INDEX, EPS_LADDER } from '../dp/params';
 import { toNumber } from '../dp/rational';
 import { chart, chartData, legend, type Series } from './chart';
@@ -57,7 +57,7 @@ export function initDefinition(): void {
     const gaussian = mech.value === 'gaussian';
     // Sensitivity is 1 here — one person changes a count by one — so σ and the
     // lattice step are the same thing, and the picture needs no rescaling.
-    const sigma = gaussian ? analyticSigma(1, eps, DELTA) : 0;
+    const sigma = gaussian ? Math.sqrt(toNumber(latticeVariance(analyticSigma(1, eps, DELTA)))) : 0;
     const half = gaussian
       ? Math.min(90, Math.max(8, Math.ceil(4.5 * sigma)))
       : Math.min(90, Math.max(8, Math.ceil(5 / eps)));
@@ -120,7 +120,7 @@ function renderDistributions(view: DefinitionView, half: number): void {
     chart({
       ariaLabel:
         `Two probability distributions over the released count, one for the database containing Alice and one ` +
-        `for the database without her. At ε = ${view.eps} they overlap almost entirely.`,
+        `for the database without her. Their centres are one count apart at ε = ${view.eps}.`,
       xLabel: 'released answer (true answers: 6 with Alice, 5 without)',
       yLabel: 'probability',
       series,
@@ -145,10 +145,9 @@ function renderDistributions(view: DefinitionView, half: number): void {
         `Two distributions of the same shape, offset by one — the single person’s worth of difference between the ` +
         `databases — each spreading further as ε falls.`,
       notice:
-        `Compare the two probability columns row by row. The question the definition asks is not whether the curves ` +
-        `look similar but whether any single row lets you tell them apart, and at ε = ${view.eps} the largest ` +
-        `difference between them is ${Math.max(...a.map(([, p], i) => Math.abs(p - b[i][1]))).toExponential(2)}. ` +
-        `The next chart turns that comparison into the ratio the definition actually bounds.`,
+        `Compare the two probability columns at each count. At ε = ${view.eps}, their largest absolute difference ` +
+        `on the chart is ${Math.max(...a.map(([, p], i) => Math.abs(p - b[i][1]))).toExponential(2)}. ` +
+        `The next chart compares the same probabilities by division.`,
     }),
   );
 }
@@ -188,7 +187,7 @@ function renderRatio(view: DefinitionView, half: number): void {
     }),
     legend([
       { label: 'ln(Pr with Alice ÷ Pr without Alice), at each output', style: 'a', kind: 'line' },
-      { label: '±ε — the rails the definition promises', style: 'ceiling', kind: 'line' },
+      { label: '±ε for pure differential privacy', style: 'ceiling', kind: 'line' },
     ]),
   );
 
@@ -196,7 +195,7 @@ function renderRatio(view: DefinitionView, half: number): void {
   mount.append(
     chartData({
       caption: 'Probability of each released answer under both databases, and the ratio between them.',
-      headers: ['Released answer', 'Pr with Alice', 'Pr without Alice', 'Ratio', 'ln(ratio)'],
+      headers: ['Released answer', 'Pr with Alice', 'Pr without Alice', 'Ratio (with ÷ without)', 'ln(ratio)'],
       rows: shown
         .filter((p) => p.withTarget > 1e-6 || p.withoutTarget > 1e-6)
         .slice(0, 60)
@@ -204,7 +203,7 @@ function renderRatio(view: DefinitionView, half: number): void {
           String(p.x),
           p.withTarget.toExponential(3),
           p.withoutTarget.toExponential(3),
-          p.ratio.toFixed(4),
+          Math.exp(logRatio(view.spec, p.x)).toFixed(4),
           logRatio(view.spec, p.x).toFixed(4),
         ]),
       trend: view.gaussian
@@ -213,9 +212,9 @@ function renderRatio(view: DefinitionView, half: number): void {
         : `The log-ratio column takes exactly two values away from the step — −${view.eps} below the shift and ` +
           `+${view.eps} above it — and never anything larger.`,
       notice: view.gaussian
-        ? `Find the first row where the last column exceeds ${view.eps}. Everything from there outward is an output ` +
-          `at which the ε promise is false, and δ = ${curve.deltaNeeded.toExponential(2)} is the total probability ` +
-          `of landing in that region. That is what δ buys and all it buys.`
+        ? `Where ln(ratio) exceeds ${view.eps}, subtract e^ε times the probability without Alice from the ` +
+          `probability with her. Summing those positive differences gives the excess in this direction. ` +
+          `Swapping the columns checks the reverse direction.`
         : `Read the last column, not the shape. It saturates at ±${view.eps} and stays there, which is the ` +
           `definition being met with equality at every output — a tight ε rather than a merely respected one. The ` +
           `largest ratio anywhere in the examined range is ${ratio(curve.maxRatio)} against a ceiling of ` +
@@ -249,10 +248,9 @@ function renderVerdict(
           `${ratio(curve.maxRatio)} against a ceiling of e^ε = ${ratio(curve.ceiling)}, so no output leaks more than ` +
           `ε allows and none leaks less than ε was paid for. ε bounds this ratio — it is not a quantity of noise.`,
         details: [
-          `No δ is needed here, and the page computes that rather than asserting it: the total probability mass on ` +
-            `outputs where the ε promise fails is ${curve.deltaNeeded.toExponential(1)}. Pure ε-DP means exactly ` +
-            `this number is zero, and the discrete Laplace mechanism achieves it because its density falls off as a ` +
-            `plain exponential in both directions, which is the one shape whose log-ratio saturates instead of growing.`,
+          `For neighbouring counts one step apart, the discrete Laplace log-ratio is exactly +ε or −ε. ` +
+            `The minimum δ is zero. The numerical sum of positive differences over the examined range is ` +
+            `${curve.deltaNeeded.toExponential(1)}, including floating-point rounding.`,
           `The bound is checked far beyond the range drawn — over ${curve.points.length} outputs rather than the few ` +
             `dozen on screen — because "the ceiling holds" would otherwise only mean "the ceiling holds where we ` +
             `happened to look". It is still a computation over the outputs examined, not a proof of the theorem; the ` +
@@ -287,26 +285,23 @@ function renderVerdict(
     // direction rather than claiming the target was met.
     const gap = curve.deltaNeeded / DELTA;
     const over = gap > 1;
+    const tail = curve.points.reduce((sum, p) =>
+      sum + (p.withTarget > curve.ceiling * p.withoutTarget ? p.withTarget : 0), 0);
     out.append(
       layered('warn', 'The rails do not hold — this is why δ exists', {
         observation:
-          `The log-ratio is a straight line: it crosses +ε, keeps climbing, and would cross any rail you drew, ` +
-          `reaching ${ratio(curve.maxRatio)} over the range examined.`,
+          `Let P be the distribution with Alice and Q the one without her. For the outputs where P(x) > e^ε Q(x), ` +
+          `the tail probability under P is ${tail.toExponential(4)} over the range examined.`,
         meaning:
-          `A Gaussian tail falls faster than any exponential, so no pure ε can bound this ratio everywhere. The ` +
-          `repair is (ε, δ): δ = ${curve.deltaNeeded.toExponential(2)} is the total probability of landing on an ` +
-          `output where the ε promise is simply false — not a little extra privacy loss, but the mass where there is ` +
-          `no promise at all.`,
+          `For every event S, differential privacy requires P(S) ≤ e^ε Q(S) + δ in both directions. ` +
+          `The minimum δ for these two distributions is approximately ${curve.deltaNeeded.toExponential(4)}. ` +
+          `It counts only the excess above e^ε Q(x) in the tail, taking the larger sum after checking both directions.`,
         details: [
-          `σ = ${num(view.sigma, 2)} was calibrated for δ = ${DELTA.toExponential(0)} using Balle & Wang's analytic ` +
-            `Gaussian mechanism — but that closed form is for the *continuous* Gaussian, and the σ it returns is then ` +
-            `handed to the discrete sampler. The two are close, not equal: the discrete mechanism here needs ` +
-            `${pct(Math.abs(gap - 1), 1)} ${over ? 'more' : 'less'} δ than the calibration targeted. The page reports ` +
-            `the gap and its direction rather than claiming the target was met.`,
-          `Re-deriving the discrete Gaussian's own accounting is Canonne–Kamath–Steinke's job, not this page's. What ` +
-            `the test suite does instead is a cross-check: the δ needed by the discrete PMF must agree with the ` +
-            `continuous closed form to within 10%. That is evidence the calibration is not badly wrong, and it is not ` +
-            `a re-derivation. The honest-scoping section lists it as such.`,
+          `The continuous Gaussian calibration targets δ = ${DELTA.toExponential(0)}. The discrete sampler rounds ` +
+            `the lattice variance up to the next 0.0001. The chart uses that same variance (σ ≈ ${num(view.sigma, 2)}). ` +
+            `For these two counts the computed δ is ${pct(Math.abs(gap - 1), 1)} ${over ? 'above' : 'below'} the target.`,
+          `The numerical sum covers ${curve.points.length} integer outputs. The chart shows a smaller window ` +
+            `around the true counts so that the central probabilities remain visible.`,
         ],
         detailsLabel: 'Why the details matter — the calibration gap, stated rather than smoothed over',
       }),
@@ -323,23 +318,24 @@ function renderReadout(view: DefinitionView): void {
     statRow(
       [
         stat('ε', String(view.eps), 'the privacy parameter'),
-        stat('e^ε', ratio(Math.exp(view.eps)), 'the ratio ceiling'),
+        stat('e^ε', ratio(Math.exp(view.eps)), view.gaussian ? 'pure-DP reference' : 'the ratio ceiling'),
         view.gaussian
-          ? stat('σ', num(view.sigma, 2), `calibrated for δ = ${DELTA.toExponential(0)}`)
+          ? stat('σ', num(view.sigma, 2), `continuous target δ = ${DELTA.toExponential(0)}`)
           : stat('noise scale b', num(1 / view.eps, 2), 'Δ/ε, with Δ = 1'),
         stat('Best possible guess', pct(guess), 'from one release, even prior'),
-        stat('Belief can move to', pct(posterior), 'from an even prior, worst case'),
+        view.gaussian
+          ? stat('Belief can move to', 'Arbitrarily close to 100%', 'in the Gaussian tails')
+          : stat('Belief can move to', pct(posterior), 'from an even prior, worst case'),
       ],
       'The privacy parameters and what they mean for an attacker',
     ),
     el('p', {
       class: 'note',
-      text:
-        `Read the last two columns together. "Best possible guess" is what an optimal attacker achieves at ` +
-        `distinguishing the two worlds from a single release — the page measures this against your own guesses in ` +
-        `Exhibit 3. "Belief can move to" is the same fact from the other side: an observer who thought it was an even ` +
-        `chance Alice was in the data cannot end up more than ${pct(posterior)} sure, whatever they see. That sentence ` +
-        `is what ε actually buys.`,
+      text: view.gaussian
+        ? `With equally likely worlds, the best single-release guess is right ${pct(guess)} of the time on average. ` +
+          'A particular count far enough into either tail can make one world arbitrarily more likely than the other.'
+        : `With equally likely worlds, the best single-release guess is right ${pct(guess)} of the time on average. ` +
+          `After any one release, the more likely world has posterior probability at most ${pct(posterior)}.`,
     }),
   );
   if (!view.gaussian) {
